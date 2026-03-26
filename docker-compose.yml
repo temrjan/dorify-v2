@@ -1,8 +1,8 @@
 services:
   dorify-backend:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api/Dockerfile
     container_name: dorify-backend
     restart: unless-stopped
     env_file: ./apps/api/.env
@@ -17,8 +17,8 @@ services:
 
   dorify-static:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
     container_name: dorify-static
     restart: unless-stopped
     security_opt: [no-new-privileges:true]
@@ -32,8 +32,8 @@ services:
 
   dorify-bot:
     build:
-      context: ./apps/bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/bot/Dockerfile
     container_name: dorify-bot
     restart: unless-stopped
     env_file: ./apps/bot/.env
