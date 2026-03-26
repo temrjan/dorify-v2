@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CoreModule } from './core/core.module';
+import { IamModule } from './modules/iam/iam.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -13,7 +14,7 @@ import { HealthController } from './health.controller';
       ttl: 60000,
       limit: 100,
     }]),
-    // Phase 1: IamModule,
+    IamModule,
     // Phase 2: CatalogModule,
     // Phase 3: OrderingModule,
     // Phase 4: PaymentModule,
