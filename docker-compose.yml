@@ -24,7 +24,7 @@ services:
     security_opt: [no-new-privileges:true]
     mem_limit: 30m
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:80/health']
+      test: ['CMD-SHELL', 'curl -sf http://localhost:80/health || exit 1']
       interval: 30s
       timeout: 5s
       retries: 3
