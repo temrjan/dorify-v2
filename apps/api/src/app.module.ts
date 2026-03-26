@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { CoreModule } from './core/core.module';
 import { IamModule } from './modules/iam/iam.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { OrderingModule } from './modules/ordering/ordering.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -17,7 +18,7 @@ import { HealthController } from './health.controller';
     }]),
     IamModule,
     CatalogModule,
-    // Phase 3: OrderingModule,
+    OrderingModule,
     // Phase 4: PaymentModule,
     // Phase 7: SearchModule,
     // Phase 6: NotificationModule,
