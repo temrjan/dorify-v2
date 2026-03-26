@@ -1,0 +1,15 @@
+import { Global, Module } from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { PrismaModule } from './database/prisma.module';
+import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import { LoggingInterceptor } from './interceptors/logging.interceptor';
+
+@Global()
+@Module({
+  imports: [PrismaModule],
+  providers: [
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+  ],
+})
+export class CoreModule {}

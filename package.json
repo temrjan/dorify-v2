@@ -1,0 +1,18 @@
+{
+  "name": "dorify-v2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant pharmacy marketplace — NestJS + DDD",
+  "scripts": {
+    "dev": "pnpm -r run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "type-check": "pnpm -r run type-check",
+    "test": "pnpm -r run test",
+    "test:e2e": "pnpm --filter api run test:e2e"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  }
+}

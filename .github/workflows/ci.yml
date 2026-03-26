@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: dorify_user
+          POSTGRES_PASSWORD: dorify_test_pass
+          POSTGRES_DB: dorify_v2_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dorify_user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://dorify_user:dorify_test_pass@localhost:5432/dorify_v2_test
+      REDIS_URL: redis://localhost:6379/5
+      JWT_SECRET: test-secret-key-at-least-32-characters-long
+      BOT_TOKEN: test-bot-token
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @dorify/api run prisma:generate
+
+      - name: Lint
+        run: pnpm --filter @dorify/api run lint
+
+      - name: Type check
+        run: pnpm --filter @dorify/api run type-check
+
+      - name: Test
+        run: pnpm --filter @dorify/api run test --passWithNoTests
+
+      - name: Build
+        run: pnpm --filter @dorify/api run build
+
+  deploy:
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            cd /opt/dorify-v2
+            git pull origin main
+            docker compose build dorify-api
+            docker compose up -d dorify-api
+            sleep 5
+            docker compose ps
+            curl -sf http://localhost:3001/api/v1/health || exit 1

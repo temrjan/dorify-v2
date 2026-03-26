@@ -1,0 +1,367 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════════
+
+enum UserRole {
+  USER
+  PHARMACY_OWNER
+  ADMIN
+}
+
+enum PharmacyType {
+  PHARMACY
+  DISTRIBUTOR
+  MANUFACTURER
+}
+
+enum SubscriptionPlan {
+  FREE
+  OPTIMA
+  PRIME
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING_MODERATION
+  PUBLISHED
+  REJECTED
+  HIDDEN
+  EXPIRED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERING
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  EXPIRED
+}
+
+enum PaymentProvider {
+  MULTICARD
+}
+
+enum DeliveryType {
+  PICKUP
+  DELIVERY
+}
+
+enum AuditAction {
+  USER_LOGIN
+  USER_AUTH_FAILURE
+  PRODUCT_CREATED
+  PRODUCT_UPDATED
+  PRODUCT_MODERATED
+  PRODUCT_DELETED
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  ORDER_CANCELLED
+  PAYMENT_CREATED
+  PAYMENT_CONFIRMED
+  PAYMENT_FAILED
+  PHARMACY_CREATED
+  PHARMACY_UPDATED
+  PHARMACY_VERIFIED
+  ADMIN_ACTION
+  SECURITY_EVENT
+}
+
+enum AuditSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// IAM CONTEXT
+// ═══════════════════════════════════════════════════════════════════
+
+model User {
+  id             String    @id @default(cuid())
+  telegramId     BigInt    @unique
+  firstName      String
+  lastName       String?
+  username       String?
+  languageCode   String?
+  phone          String?
+  role           UserRole  @default(USER)
+  isBanned       Boolean   @default(false)
+
+  pharmacy       Pharmacy?
+  orders         Order[]   @relation("BuyerOrders")
+  auditLogs      AuditLog[]
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([telegramId])
+  @@index([role])
+}
+
+model Pharmacy {
+  id                 String             @id @default(cuid())
+  ownerId            String             @unique
+  owner              User               @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  name               String
+  slug               String             @unique
+  description        String?
+  address            String
+  phone              String
+  license            String?
+  logo               String?
+  type               PharmacyType       @default(PHARMACY)
+
+  // Multicard credentials (encrypted at rest)
+  multicardAppId     String?
+  multicardStoreId   String?
+  multicardSecret    String?
+
+  isActive           Boolean            @default(false)
+  isVerified         Boolean            @default(false)
+  subscriptionPlan   SubscriptionPlan   @default(FREE)
+
+  deliveryEnabled    Boolean            @default(false)
+  deliveryPrice      Decimal?           @db.Decimal(15, 2)
+
+  // Soft delete
+  deletedAt          DateTime?
+
+  products           Product[]
+  orders             Order[]
+  payments           Payment[]
+
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([slug])
+  @@index([isActive, isVerified])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CATALOG CONTEXT
+// ═══════════════════════════════════════════════════════════════════
+
+model Product {
+  id                    String         @id @default(cuid())
+  pharmacyId            String
+  pharmacy              Pharmacy       @relation(fields: [pharmacyId], references: [id], onDelete: Restrict)
+
+  name                  String
+  description           String?
+  activeSubstance       String?
+  manufacturer          String?
+  barcode               String?
+  category              String?
+
+  price                 Decimal        @db.Decimal(15, 2)
+  imageUrl              String?
+
+  // OFD (fiscal)
+  ikpu                  String?
+  packageCode           String?
+  vat                   Int?
+
+  // Stock
+  stock                 Int            @default(0)
+  isAvailable           Boolean        @default(true)
+  requiresPrescription  Boolean        @default(false)
+
+  // Moderation
+  status                ProductStatus  @default(DRAFT)
+  moderatedBy           String?
+  moderatedAt           DateTime?
+  moderationNote        String?
+
+  // Soft delete
+  deletedAt             DateTime?
+
+  orderItems            OrderItem[]
+
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([pharmacyId, status])
+  @@index([pharmacyId, isAvailable])
+  @@index([name])
+  @@index([activeSubstance])
+  @@index([status, createdAt])
+  @@index([category])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ORDERING CONTEXT
+// ═══════════════════════════════════════════════════════════════════
+
+model Order {
+  id                 String          @id @default(cuid())
+  pharmacyId         String
+  pharmacy           Pharmacy        @relation(fields: [pharmacyId], references: [id], onDelete: Restrict)
+  buyerId            String
+  buyer              User            @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
+
+  status             OrderStatus     @default(PENDING)
+  paymentStatus      PaymentStatus   @default(PENDING)
+  totalAmount        Decimal         @db.Decimal(15, 2)
+
+  deliveryType       DeliveryType    @default(PICKUP)
+  deliveryAddress    String?
+  contactPhone       String
+  comment            String?
+
+  items              OrderItem[]
+  payments           Payment[]
+
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([buyerId, createdAt])
+  @@index([pharmacyId, status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id                 String    @id @default(cuid())
+  orderId            String
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId          String
+  product            Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  productName        String
+  quantity           Int
+  priceAtTime        Decimal   @db.Decimal(15, 2)
+
+  createdAt          DateTime  @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAYMENT CONTEXT
+// ═══════════════════════════════════════════════════════════════════
+
+model Payment {
+  id                 String           @id @default(cuid())
+  orderId            String
+  order              Order            @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  pharmacyId         String
+  pharmacy           Pharmacy         @relation(fields: [pharmacyId], references: [id], onDelete: Restrict)
+
+  provider           PaymentProvider  @default(MULTICARD)
+  status             PaymentStatus    @default(PENDING)
+  amount             Decimal          @db.Decimal(15, 2)
+
+  // Multicard data
+  invoiceId          String?          @unique
+  checkoutUrl        String?
+
+  // Confirmation data
+  transactionId      String?
+  cardPan            String?
+  receiptUrl         String?
+
+  paidAt             DateTime?
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([invoiceId])
+  @@index([pharmacyId, status])
+  @@index([orderId])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEARCH CONTEXT (AI)
+// ═══════════════════════════════════════════════════════════════════
+
+model Conversation {
+  id                 String    @id @default(cuid())
+  userId             String
+  pharmacyId         String?
+  isActive           Boolean   @default(true)
+
+  messages           Message[]
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([userId, isActive])
+}
+
+model Message {
+  id                 String    @id @default(cuid())
+  conversationId     String
+  conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role               String
+  content            String
+
+  createdAt          DateTime  @default(now())
+
+  @@index([conversationId])
+}
+
+model SearchQuery {
+  id                 String    @id @default(cuid())
+  userId             String
+  pharmacyId         String?
+  query              String
+  resultsCount       Int       @default(0)
+  responseTime       Int?
+
+  createdAt          DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AUDIT
+// ═══════════════════════════════════════════════════════════════════
+
+model AuditLog {
+  id                 String         @id @default(cuid())
+  userId             String?
+  user               User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action             AuditAction
+  severity           AuditSeverity  @default(LOW)
+  resource           String?
+  resourceId         String?
+  description        String?
+
+  changesBefore      Json?
+  changesAfter       Json?
+
+  ip                 String?
+  userAgent          String?
+  requestId          String?
+
+  createdAt          DateTime       @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([resource, resourceId])
+}
