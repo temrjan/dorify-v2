@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dorify brand */
+  --dorify-primary: #60A5FA;
+  --dorify-primary-dark: #3B82F6;
+  --dorify-primary-light: #DBEAFE;
+  --dorify-secondary: #FA6079;
+  --dorify-secondary-light: #FEE2E8;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+  background: var(--tg-theme-secondary-bg-color, #EFEFF4);
+  color: var(--tg-theme-text-color, #000000);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Telegram theme adaptive utilities */
+.bg-tg-bg { background: var(--tg-theme-bg-color, #FFFFFF); }
+.bg-tg-secondary { background: var(--tg-theme-secondary-bg-color, #EFEFF4); }
+.bg-tg-section { background: var(--tg-theme-section-bg-color, #FFFFFF); }
+.text-tg { color: var(--tg-theme-text-color, #000000); }
+.text-tg-hint { color: var(--tg-theme-hint-color, #707579); }
+.text-tg-link { color: var(--tg-theme-link-color, #007AFF); }
