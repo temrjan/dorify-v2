@@ -1,9 +1,9 @@
 services:
-  dorify-api:
+  dorify-backend:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-    container_name: dorify-v2-api
+    container_name: dorify-backend
     restart: unless-stopped
     env_file: ./apps/api/.env
     security_opt: [no-new-privileges:true]
@@ -15,26 +15,36 @@ services:
       retries: 3
     networks: [proxy, internal]
 
-  # dorify-web:
-  #   build:
-  #     context: ./apps/web
-  #     dockerfile: Dockerfile
-  #   container_name: dorify-v2-web
-  #   restart: unless-stopped
-  #   security_opt: [no-new-privileges:true]
-  #   mem_limit: 30m
-  #   networks: [proxy]
+  dorify-static:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: dorify-static
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    mem_limit: 30m
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:80/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [proxy]
 
-  # dorify-bot:
-  #   build:
-  #     context: ./apps/bot
-  #     dockerfile: Dockerfile
-  #   container_name: dorify-v2-bot
-  #   restart: unless-stopped
-  #   env_file: ./apps/bot/.env
-  #   security_opt: [no-new-privileges:true]
-  #   mem_limit: 80m
-  #   networks: [internal]
+  dorify-bot:
+    build:
+      context: ./apps/bot
+      dockerfile: Dockerfile
+    container_name: dorify-bot
+    restart: unless-stopped
+    env_file: ./apps/bot/.env
+    security_opt: [no-new-privileges:true]
+    mem_limit: 80m
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3002/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [internal]
 
 networks:
   proxy:

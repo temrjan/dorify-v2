@@ -77,8 +77,8 @@ jobs:
           script: |
             cd /opt/dorify-v2
             git pull origin main
-            docker compose build dorify-api
-            docker compose up -d dorify-api
-            sleep 5
+            docker compose build
+            docker compose up -d
+            sleep 10
             docker compose ps
             curl -sf http://localhost:3001/api/v1/health || exit 1
