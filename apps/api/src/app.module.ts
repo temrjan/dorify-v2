@@ -3,6 +3,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CoreModule } from './core/core.module';
 import { IamModule } from './modules/iam/iam.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -15,7 +16,7 @@ import { HealthController } from './health.controller';
       limit: 100,
     }]),
     IamModule,
-    // Phase 2: CatalogModule,
+    CatalogModule,
     // Phase 3: OrderingModule,
     // Phase 4: PaymentModule,
     // Phase 7: SearchModule,
