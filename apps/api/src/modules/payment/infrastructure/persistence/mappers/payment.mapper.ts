@@ -1,6 +1,6 @@
 import type { Payment as PrismaPayment } from '@prisma/client';
-import { Payment, PaymentStatus } from '../../domain/entities/payment.entity';
-import { Money } from '../../../catalog/domain/value-objects/money.vo';
+import { Payment, PaymentStatus } from '../../../domain/entities/payment.entity';
+import { Money } from '../../../../catalog/domain/value-objects/money.vo';
 
 export class PaymentMapper {
   static toDomain(record: PrismaPayment): Payment {

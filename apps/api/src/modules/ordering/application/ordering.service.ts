@@ -6,7 +6,6 @@ import { PRODUCT_REPOSITORY } from '../../catalog/domain/repositories/product.re
 import type { ProductRepository } from '../../catalog/domain/repositories/product.repository';
 import { Order, OrderStatus } from '../domain/entities/order.entity';
 import { OrderItem } from '../domain/entities/order-item.entity';
-import { Money } from '../../catalog/domain/value-objects/money.vo';
 import type { PaginatedResult } from '@common/dto/pagination.dto';
 import type { PaginationDto } from '@common/dto/pagination.dto';
 import type { PlaceOrderDto, UpdateOrderStatusDto, OrderResponse, OrderItemResponse } from './dto/order.dto';

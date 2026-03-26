@@ -9,7 +9,7 @@ import type { OrderRepository } from '../../ordering/domain/repositories/order.r
 import { PHARMACY_REPOSITORY } from '../../iam/domain/repositories/pharmacy.repository';
 import type { PharmacyRepository } from '../../iam/domain/repositories/pharmacy.repository';
 import { Payment } from '../domain/entities/payment.entity';
-import { PaymentConfirmedEvent, PaymentFailedEvent } from '../domain/events/index';
+import { PaymentConfirmedEvent } from '../domain/events/index';
 import { config } from '@core/config/env.config';
 import type { PaymentResponse } from './dto/payment.dto';
 

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { UserRole } from '@prisma/client';
 import { PrismaService } from '@core/database/prisma.service';
 import type { UserRepository } from '../../domain/repositories/user.repository';
 import type { User } from '../../domain/entities/user.entity';
@@ -30,14 +31,14 @@ export class PrismaUserRepository implements UserRepository {
 
     await this.prisma.user.upsert({
       where: { id: data.id },
-      create: data,
+      create: { ...data, role: data.role as UserRole },
       update: {
         firstName: data.firstName,
         lastName: data.lastName,
         username: data.username,
         languageCode: data.languageCode,
         phone: data.phone,
-        role: data.role,
+        role: data.role as UserRole,
         isBanned: data.isBanned,
       },
     });

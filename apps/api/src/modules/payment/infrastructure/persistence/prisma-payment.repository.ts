@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { PaymentProvider } from '@prisma/client';
 import { PrismaService } from '@core/database/prisma.service';
 import type { PaymentRepository } from '../../domain/repositories/payment.repository';
 import { Payment } from '../../domain/entities/payment.entity';
@@ -30,7 +31,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
     const data = PaymentMapper.toPersistence(payment);
     await this.prisma.payment.upsert({
       where: { id: data.id },
-      create: data,
+      create: { ...data, provider: data.provider as PaymentProvider },
       update: {
         status: data.status,
         invoiceId: data.invoiceId,

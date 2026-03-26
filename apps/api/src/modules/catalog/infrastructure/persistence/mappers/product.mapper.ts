@@ -1,7 +1,7 @@
 import type { Product as PrismaProduct } from '@prisma/client';
-import { Product, ProductStatus } from '../../domain/entities/product.entity';
-import { Money } from '../../domain/value-objects/money.vo';
-import { Ikpu } from '../../domain/value-objects/ikpu.vo';
+import { Product, ProductStatus } from '../../../domain/entities/product.entity';
+import { Money } from '../../../domain/value-objects/money.vo';
+import { Ikpu } from '../../../domain/value-objects/ikpu.vo';
 
 export class ProductMapper {
   static toDomain(record: PrismaProduct): Product {

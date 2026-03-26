@@ -1,7 +1,7 @@
 import type { Order as PrismaOrder, OrderItem as PrismaOrderItem } from '@prisma/client';
-import { Order, OrderStatus, PaymentStatus } from '../../domain/entities/order.entity';
-import { OrderItem } from '../../domain/entities/order-item.entity';
-import { Money } from '../../../catalog/domain/value-objects/money.vo';
+import { Order, OrderStatus, PaymentStatus } from '../../../domain/entities/order.entity';
+import { OrderItem } from '../../../domain/entities/order-item.entity';
+import { Money } from '../../../../catalog/domain/value-objects/money.vo';
 
 type PrismaOrderWithItems = PrismaOrder & { items: PrismaOrderItem[] };
 

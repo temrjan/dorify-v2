@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { DeliveryType } from '@prisma/client';
 import { PrismaService } from '@core/database/prisma.service';
 import type { OrderRepository } from '../../domain/repositories/order.repository';
 import type { Order } from '../../domain/entities/order.entity';
@@ -74,6 +75,7 @@ export class PrismaOrderRepository implements OrderRepository {
         where: { id: data.id },
         create: {
           ...data,
+          deliveryType: data.deliveryType as DeliveryType,
           items: { create: itemsData.map(({ orderId: _, ...item }) => item) },
         },
         update: {

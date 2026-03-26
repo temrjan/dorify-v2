@@ -35,7 +35,7 @@ export class IamService {
     const accessToken = jwt.sign(
       { sub: 'admin', role: 'ADMIN' },
       config.JWT_SECRET,
-      { expiresIn: config.JWT_EXPIRES_IN },
+      { expiresIn: config.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] },
     );
 
     return {

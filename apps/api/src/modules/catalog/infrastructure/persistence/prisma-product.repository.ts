@@ -4,7 +4,7 @@ import type { ProductRepository, ProductListFilters } from '../../domain/reposit
 import type { Product } from '../../domain/entities/product.entity';
 import type { PaginatedResult, PaginationDto } from '@common/dto/pagination.dto';
 import { ProductMapper } from './mappers/product.mapper';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, ProductStatus } from '@prisma/client';
 
 @Injectable()
 export class PrismaProductRepository implements ProductRepository {
@@ -116,7 +116,7 @@ export class PrismaProductRepository implements ProductRepository {
     const where: Prisma.ProductWhereInput = { deletedAt: null };
 
     if (filters.pharmacyId) where.pharmacyId = filters.pharmacyId;
-    if (filters.status) where.status = filters.status;
+    if (filters.status) where.status = filters.status as ProductStatus;
     if (filters.isAvailable !== undefined) where.isAvailable = filters.isAvailable;
     if (filters.category) where.category = filters.category;
     if (filters.search) {
