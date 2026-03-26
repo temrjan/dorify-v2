@@ -1,19 +1,21 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FixedLayout, Tabbar } from '@telegram-apps/telegram-ui';
 import type { ReactNode } from 'react';
+import { IconHome, IconSearch, IconCart, IconOrders } from '@shared/ui/icons';
+import { useCartStore, selectTotalItems } from '@shared/stores/cartStore';
 
 const TABS = [
-  { id: '/', label: 'Главная', icon: '🏠' },
-  { id: '/search', label: 'Поиск', icon: '🔍' },
-  { id: '/cart', label: 'Корзина', icon: '🛒' },
-  { id: '/orders', label: 'Заказы', icon: '📦' },
+  { id: '/', label: 'Главная', Icon: IconHome },
+  { id: '/search', label: 'Поиск', Icon: IconSearch },
+  { id: '/cart', label: 'Корзина', Icon: IconCart },
+  { id: '/orders', label: 'Заказы', Icon: IconOrders },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const cartCount = useCartStore(selectTotalItems);
 
-  // Hide tabbar on checkout and product detail
   const hideTabbar = location.pathname.startsWith('/checkout') || location.pathname.startsWith('/product/');
 
   return (
@@ -23,16 +25,30 @@ export function Layout({ children }: { children: ReactNode }) {
       {!hideTabbar && (
         <FixedLayout vertical="bottom">
           <Tabbar>
-            {TABS.map((tab) => (
-              <Tabbar.Item
-                key={tab.id}
-                text={tab.label}
-                selected={location.pathname === tab.id}
-                onClick={() => navigate(tab.id)}
-              >
-                <span className="text-xl">{tab.icon}</span>
-              </Tabbar.Item>
-            ))}
+            {TABS.map((tab) => {
+              const isActive = location.pathname === tab.id;
+              return (
+                <Tabbar.Item
+                  key={tab.id}
+                  text={tab.label}
+                  selected={isActive}
+                  onClick={() => navigate(tab.id)}
+                >
+                  <div className="relative">
+                    <tab.Icon
+                      width={24}
+                      height={24}
+                      className={isActive ? 'text-dorify-primary' : 'text-[var(--tg-theme-hint-color,#707579)]'}
+                    />
+                    {tab.id === '/cart' && cartCount > 0 && (
+                      <span className="absolute -top-1.5 -right-2.5 bg-dorify-secondary text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                        {cartCount > 99 ? '99+' : cartCount}
+                      </span>
+                    )}
+                  </div>
+                </Tabbar.Item>
+              );
+            })}
           </Tabbar>
         </FixedLayout>
       )}
