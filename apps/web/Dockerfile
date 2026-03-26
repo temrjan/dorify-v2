@@ -4,7 +4,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
-RUN pnpm install --frozen-lockfile --filter @dorify/web
+RUN pnpm install --frozen-lockfile --filter @dorify/web --shamefully-hoist
 COPY apps/web/ apps/web/
 RUN cd apps/web && pnpm build
 

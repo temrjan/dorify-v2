@@ -5,7 +5,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: dorify-backend
     restart: unless-stopped
-    env_file: ./apps/api/.env
+    env_file: ./.env
     security_opt: [no-new-privileges:true]
     mem_limit: 256m
     healthcheck:
