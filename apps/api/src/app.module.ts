@@ -7,6 +7,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { OrderingModule } from './modules/ordering/ordering.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { SearchModule } from './modules/search/search.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -23,7 +24,7 @@ import { HealthController } from './health.controller';
     OrderingModule,
     PaymentModule,
     NotificationModule,
-    // Phase 7: SearchModule,
+    SearchModule,
   ],
 })
 export class AppModule {}
