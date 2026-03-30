@@ -30,4 +30,5 @@ apps/api/prisma/*.db
 # Build artifacts
 *.js.map
 *.d.ts
+!**/vite-env.d.ts
 !jest.config.ts
