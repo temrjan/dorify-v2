@@ -13,7 +13,10 @@ export default function CheckoutPage() {
   const totalPrice = useCartStore(selectTotalPrice);
   const itemsByPharmacy = useCartStore(selectItemsByPharmacy);
 
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(() => {
+    const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    return user ? '+998' : '';
+  });
   const [address, setAddress] = useState('');
   const [deliveryType, setDeliveryType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
 
@@ -28,14 +31,6 @@ export default function CheckoutPage() {
       tg?.BackButton.hide();
     };
   }, [navigate]);
-
-  // Pre-fill phone from Telegram
-  useEffect(() => {
-    const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    if (user && !phone) {
-      setPhone('+998');
-    }
-  }, [phone]);
 
   const mutation = useMutation({
     mutationFn: async () => {

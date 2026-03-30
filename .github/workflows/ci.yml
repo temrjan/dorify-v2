@@ -50,10 +50,13 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @dorify/api run prisma:generate
 
-      - name: Lint
+      - name: Lint API
         run: pnpm --filter @dorify/api run lint
 
-      - name: Type check
+      - name: Lint Web
+        run: pnpm --filter @dorify/web run lint
+
+      - name: Type check API
         run: pnpm --filter @dorify/api run type-check
 
       - name: Test
