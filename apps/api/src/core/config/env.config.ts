@@ -12,8 +12,11 @@ const EnvSchema = z.object({
     .string()
     .default('*')
     .transform((val) => (val === '*' ? '*' : val.split(',').map((s) => s.trim()))),
+  MULTICARD_API_URL: z.string().url().default('https://dev-mesh.multicard.uz'),
   MULTICARD_CALLBACK_URL: z.string().url().optional(),
-  ENCRYPTION_KEY: z.string().min(32).optional(),
+  ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be 64 hex chars (32 bytes for AES-256)'),
   INIT_DATA_TTL_SECONDS: z.coerce.number().default(86400),
 });
 

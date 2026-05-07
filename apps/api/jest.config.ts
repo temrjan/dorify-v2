@@ -8,6 +8,7 @@ const config: Config = {
   collectCoverageFrom: ['**/*.ts', '!**/*.module.ts', '!main.ts', '!**/*.dto.ts'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/../test/jest-setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^@shared/(.*)$': '<rootDir>/shared/$1',
