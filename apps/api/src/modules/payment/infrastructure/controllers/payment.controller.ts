@@ -26,10 +26,11 @@ export class PaymentController {
     @Body(new ZodValidationPipe(MulticardCallbackSchema)) dto: MulticardCallbackDto,
   ) {
     await this.paymentService.processCallback({
+      storeId: dto.store_id,
       invoiceId: dto.invoice_id,
-      transactionId: dto.transaction_id,
-      status: dto.status,
       amount: dto.amount,
+      uuid: dto.uuid,
+      billingId: dto.billing_id,
       cardPan: dto.card_pan,
       receiptUrl: dto.receipt_url,
       sign: dto.sign,

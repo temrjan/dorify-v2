@@ -3,7 +3,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PAYMENT_REPOSITORY } from '../domain/repositories/payment.repository';
 import type { PaymentRepository } from '../domain/repositories/payment.repository';
 import { PAYMENT_GATEWAY } from '../domain/ports/payment-gateway.port';
-import type { PaymentGatewayPort, CallbackData } from '../domain/ports/payment-gateway.port';
+import type {
+  PaymentGatewayPort,
+  CallbackData,
+  PaymentGatewayCredentials,
+} from '../domain/ports/payment-gateway.port';
 import { ORDER_REPOSITORY } from '../../ordering/domain/repositories/order.repository';
 import type { OrderRepository } from '../../ordering/domain/repositories/order.repository';
 import { PHARMACY_REPOSITORY } from '../../iam/domain/repositories/pharmacy.repository';
@@ -11,6 +15,8 @@ import type { PharmacyRepository } from '../../iam/domain/repositories/pharmacy.
 import { Payment } from '../domain/entities/payment.entity';
 import { PaymentConfirmedEvent } from '../domain/events/index';
 import { config } from '@core/config/env.config';
+import { EncryptionService } from '@core/crypto/encryption.service';
+import type { Pharmacy } from '../../iam/domain/entities/pharmacy.entity';
 import type { PaymentResponse } from './dto/payment.dto';
 
 @Injectable()
@@ -23,6 +29,7 @@ export class PaymentService {
     @Inject(ORDER_REPOSITORY) private readonly orderRepo: OrderRepository,
     @Inject(PHARMACY_REPOSITORY) private readonly pharmacyRepo: PharmacyRepository,
     private readonly eventEmitter: EventEmitter2,
+    private readonly encryption: EncryptionService,
   ) {}
 
   async createInvoice(orderId: string, buyerId: string): Promise<PaymentResponse> {
@@ -57,12 +64,9 @@ export class PaymentService {
       ?? `https://api.dorify.uz/api/v1/payments/callback`;
 
     try {
+      const credentials = this.gatewayCredentialsFor(pharmacy);
       const result = await this.gateway.createInvoice(
-        {
-          appId: pharmacy.multicardAppId!,
-          storeId: pharmacy.multicardStoreId!,
-          secret: pharmacy.multicardSecret!,
-        },
+        credentials,
         {
           invoiceId: payment.getId(),
           amount: payment.amount.amount,
@@ -106,8 +110,9 @@ export class PaymentService {
       return;
     }
 
-    // 3. Verify signature
-    const valid = this.gateway.verifyCallbackSignature(pharmacy.multicardSecret, callback);
+    // 3. Verify signature (decrypt secret first)
+    const plaintextSecret = this.encryption.decrypt(pharmacy.multicardSecret);
+    const valid = this.gateway.verifyCallbackSignature(plaintextSecret, callback);
     if (!valid) {
       this.logger.warn(`Invalid callback signature for invoice ${callback.invoiceId}`);
       return;
@@ -115,7 +120,7 @@ export class PaymentService {
 
     // 4. Atomic mark as paid (race-condition-safe)
     const updated = await this.paymentRepo.markPaidAtomically(callback.invoiceId, {
-      transactionId: callback.transactionId,
+      transactionId: callback.uuid,
       cardPan: callback.cardPan,
       receiptUrl: callback.receiptUrl,
     });
@@ -171,5 +176,16 @@ export class PaymentService {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substring(2, 10);
     return `c${timestamp}${random}`;
+  }
+
+  private gatewayCredentialsFor(pharmacy: Pharmacy): PaymentGatewayCredentials {
+    if (!pharmacy.multicardAppId || !pharmacy.multicardStoreId || !pharmacy.multicardSecret) {
+      throw new ForbiddenException('Pharmacy has no payment credentials configured');
+    }
+    return {
+      appId: pharmacy.multicardAppId,
+      storeId: pharmacy.multicardStoreId,
+      secret: this.encryption.decrypt(pharmacy.multicardSecret),
+    };
   }
 }
