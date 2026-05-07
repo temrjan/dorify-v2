@@ -15,6 +15,9 @@ coverage/
 *.swp
 *.swo
 
+# Team workflow state (per Appendix A of TEAM-CONSTITUTION.md)
+.claude/workflow-state.json
+
 # OS
 .DS_Store
 Thumbs.db
