@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException, Inject, UnauthorizedE
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { config } from '@core/config/env.config';
+import { EncryptionService } from '@core/crypto/encryption.service';
 import { USER_REPOSITORY } from '../domain/repositories/user.repository';
 import type { UserRepository } from '../domain/repositories/user.repository';
 import { PHARMACY_REPOSITORY } from '../domain/repositories/pharmacy.repository';
@@ -20,6 +21,7 @@ export class IamService {
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepo: UserRepository,
     @Inject(PHARMACY_REPOSITORY) private readonly pharmacyRepo: PharmacyRepository,
+    private readonly encryption: EncryptionService,
   ) {}
 
   async adminLogin(dto: AdminLoginDto): Promise<AuthResponse> {
@@ -117,7 +119,7 @@ export class IamService {
       multicardAppId: pharmacy.multicardAppId,
       multicardStoreId: pharmacy.multicardStoreId,
       multicardSecret: pharmacy.multicardSecret
-        ? `****${pharmacy.multicardSecret.slice(-4)}`
+        ? this.maskSecret(this.encryption.decrypt(pharmacy.multicardSecret))
         : undefined,
     };
   }
@@ -128,10 +130,12 @@ export class IamService {
       throw new NotFoundException('Pharmacy not found');
     }
 
+    const encryptedSecret = this.encryption.encrypt(dto.multicardSecret);
+
     pharmacy.updateMulticardCredentials({
       appId: dto.multicardAppId,
       storeId: dto.multicardStoreId,
-      secret: dto.multicardSecret,
+      secret: encryptedSecret,
     });
 
     await this.pharmacyRepo.save(pharmacy);
@@ -139,8 +143,13 @@ export class IamService {
     return {
       multicardAppId: pharmacy.multicardAppId,
       multicardStoreId: pharmacy.multicardStoreId,
-      multicardSecret: `****${dto.multicardSecret.slice(-4)}`,
+      multicardSecret: this.maskSecret(dto.multicardSecret),
     };
+  }
+
+  private maskSecret(plaintext: string): string {
+    if (plaintext.length <= 4) return '****';
+    return `****${plaintext.slice(-4)}`;
   }
 
   private toPharmacyResponse(pharmacy: Pharmacy): PharmacyResponse {

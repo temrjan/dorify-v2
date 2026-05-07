@@ -1,7 +1,5 @@
 import { Payment, PaymentStatus } from '../domain/entities/payment.entity';
 import { Money } from '../../catalog/domain/value-objects/money.vo';
-import { MulticardAdapter } from '../infrastructure/multicard/multicard.adapter';
-import { createHash } from 'crypto';
 
 // ── Payment Entity ──────────────────────────────────────────
 
@@ -120,54 +118,5 @@ describe('Payment', () => {
   });
 });
 
-// ── Multicard Adapter (signature verification) ──────────────
-
-describe('MulticardAdapter', () => {
-  const adapter = new MulticardAdapter();
-  const secret = 'test-secret-key';
-
-  it('should verify valid callback signature', () => {
-    const callback = {
-      invoiceId: 'inv-123',
-      transactionId: 'tx-456',
-      status: 'paid',
-      amount: 55000,
-      sign: '',
-    };
-
-    // Calculate expected MD5
-    const data = `${callback.invoiceId}${callback.transactionId}${callback.status}${callback.amount}${secret}`;
-    callback.sign = createHash('md5').update(data).digest('hex');
-
-    expect(adapter.verifyCallbackSignature(secret, callback)).toBe(true);
-  });
-
-  it('should reject invalid signature', () => {
-    const callback = {
-      invoiceId: 'inv-123',
-      transactionId: 'tx-456',
-      status: 'paid',
-      amount: 55000,
-      sign: 'invalid-signature',
-    };
-
-    expect(adapter.verifyCallbackSignature(secret, callback)).toBe(false);
-  });
-
-  it('should reject tampered amount', () => {
-    const callback = {
-      invoiceId: 'inv-123',
-      transactionId: 'tx-456',
-      status: 'paid',
-      amount: 55000,
-      sign: '',
-    };
-
-    const data = `${callback.invoiceId}${callback.transactionId}${callback.status}${callback.amount}${secret}`;
-    callback.sign = createHash('md5').update(data).digest('hex');
-
-    // Tamper the amount
-    callback.amount = 100;
-    expect(adapter.verifyCallbackSignature(secret, callback)).toBe(false);
-  });
-});
+// MulticardAdapter тесты вынесены в
+// src/modules/payment/infrastructure/multicard/__tests__/multicard.adapter.spec.ts
