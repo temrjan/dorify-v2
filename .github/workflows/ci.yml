@@ -84,6 +84,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
+            set -e
             cd /opt/dorify-v2
             git pull origin main
             docker compose build
