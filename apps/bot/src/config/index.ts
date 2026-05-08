@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const EnvSchema = z.object({
   BOT_TOKEN: z.string().min(1),
-  WEBAPP_URL: z.string().url().default('https://dorify.uz'),
+  WEBAPP_URL: z.string().url().default('https://app.dorify.uz'),
   HEALTH_PORT: z.coerce.number().default(3002),
   ADMIN_CHAT_IDS: z
     .string()
