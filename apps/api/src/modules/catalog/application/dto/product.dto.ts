@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProductStatus } from '../../domain/entities/product.entity';
 
 export const CreateProductSchema = z.object({
   name: z.string().min(2).max(300),
@@ -46,6 +47,7 @@ export type ModerateProductDto = z.infer<typeof ModerateProductSchema>;
 export const ProductFiltersSchema = z.object({
   category: z.string().optional(),
   search: z.string().optional(),
+  status: z.nativeEnum(ProductStatus).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -64,10 +66,12 @@ export interface ProductResponse {
   price: number;
   imageUrl?: string;
   ikpu?: string;
+  packageCode?: string;
   vat?: number;
   stock: number;
   isAvailable: boolean;
   requiresPrescription: boolean;
   status: string;
+  moderationNote?: string;
   createdAt: string;
 }

@@ -1,3 +1,11 @@
+export type ProductStatus =
+  | 'DRAFT'
+  | 'PENDING_MODERATION'
+  | 'PUBLISHED'
+  | 'REJECTED'
+  | 'HIDDEN'
+  | 'EXPIRED';
+
 export interface Product {
   id: string;
   pharmacyId: string;
@@ -5,13 +13,18 @@ export interface Product {
   description?: string;
   activeSubstance?: string;
   manufacturer?: string;
+  barcode?: string;
   category?: string;
   price: number;
   imageUrl?: string;
+  ikpu?: string;
+  packageCode?: string;
+  vat?: number;
   stock: number;
   isAvailable: boolean;
   requiresPrescription: boolean;
-  status: string;
+  status: ProductStatus;
+  moderationNote?: string;
   createdAt: string;
 }
 
