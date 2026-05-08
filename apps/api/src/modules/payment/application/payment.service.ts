@@ -62,6 +62,8 @@ export class PaymentService {
     // 5. Call Multicard API
     const callbackUrl = config.MULTICARD_CALLBACK_URL
       ?? `https://api.dorify.uz/api/v1/payments/callback`;
+    const webUrl = config.WEB_URL.replace(/\/+$/, '');
+    const returnUrl = `${webUrl}/payment/result?orderId=${encodeURIComponent(orderId)}`;
 
     try {
       const credentials = this.gatewayCredentialsFor(pharmacy);
@@ -72,6 +74,7 @@ export class PaymentService {
           amount: payment.amount.amount,
           description: `Order ${orderId}`,
           callbackUrl,
+          returnUrl,
           items: order.items.map((item) => ({
             name: item.productName,
             quantity: item.quantity,

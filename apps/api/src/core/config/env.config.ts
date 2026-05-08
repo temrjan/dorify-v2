@@ -14,6 +14,7 @@ const EnvSchema = z.object({
     .transform((val) => (val === '*' ? '*' : val.split(',').map((s) => s.trim()))),
   MULTICARD_API_URL: z.string().url().default('https://dev-mesh.multicard.uz'),
   MULTICARD_CALLBACK_URL: z.string().url().optional(),
+  WEB_URL: z.string().url().default('https://app.dorify.uz'),
   ENCRYPTION_KEY: z
     .string()
     .regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be 64 hex chars (32 bytes for AES-256)'),

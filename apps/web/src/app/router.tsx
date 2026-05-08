@@ -7,6 +7,7 @@ const ProductPage = lazy(() => import('@features/product/ui/ProductPage'));
 const SearchPage = lazy(() => import('@features/search/ui/SearchPage'));
 const CartPage = lazy(() => import('@features/cart/ui/CartPage'));
 const CheckoutPage = lazy(() => import('@features/checkout/ui/CheckoutPage'));
+const PaymentResultPage = lazy(() => import('@features/payment/ui/PaymentResultPage'));
 const OrdersPage = lazy(() => import('@features/orders/ui/OrdersPage'));
 const PharmacyPanelPage = lazy(() => import('@features/pharmacy-panel/ui/PharmacyPanelPage'));
 
@@ -27,6 +28,7 @@ export function AppRouter() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/payment/result" element={<PaymentResultPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/pharmacy/*" element={<PharmacyPanelPage />} />
       </Routes>

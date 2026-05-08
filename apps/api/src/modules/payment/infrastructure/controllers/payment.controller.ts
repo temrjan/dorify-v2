@@ -47,7 +47,8 @@ export class PaymentController {
   }
 
   @Get('order/:orderId')
-  getPaymentByOrder(@Param('orderId') orderId: string) {
-    return this.paymentService.getPaymentByOrder(orderId);
+  async getPaymentByOrder(@Param('orderId') orderId: string) {
+    const payment = await this.paymentService.getPaymentByOrder(orderId);
+    return payment ?? null;
   }
 }
