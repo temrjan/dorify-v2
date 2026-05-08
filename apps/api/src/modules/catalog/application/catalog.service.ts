@@ -88,12 +88,18 @@ export class CatalogService {
     return this.toResponse(product);
   }
 
+  async getMyProduct(productId: string): Promise<ProductResponse> {
+    const pharmacyId = TenantContext.requirePharmacyId();
+    const product = await this.findOwnedProduct(productId, pharmacyId);
+    return this.toResponse(product);
+  }
+
   async listMyProducts(filters: ProductFiltersDto): Promise<PaginatedResult<ProductResponse>> {
     const pharmacyId = TenantContext.requirePharmacyId();
 
     const result = await this.productRepo.findByPharmacyId(
       pharmacyId,
-      { category: filters.category, search: filters.search },
+      { category: filters.category, search: filters.search, status: filters.status },
       { page: filters.page, limit: filters.limit },
     );
 
@@ -182,11 +188,13 @@ export class CatalogService {
       price: product.price.amount,
       imageUrl: product.imageUrl,
       ikpu: product.ikpu?.code,
+      packageCode: product.packageCode,
       vat: product.vat,
       stock: product.stock,
       isAvailable: product.isAvailable,
       requiresPrescription: product.requiresPrescription,
       status: product.status,
+      moderationNote: product.moderationNote,
       createdAt: product.createdAt.toISOString(),
     };
   }

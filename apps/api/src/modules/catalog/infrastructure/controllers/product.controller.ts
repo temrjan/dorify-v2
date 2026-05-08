@@ -48,6 +48,11 @@ export class PharmacyProductController {
     return this.catalogService.listMyProducts(filters);
   }
 
+  @Get(':id')
+  getMyProduct(@Param('id') id: string) {
+    return this.catalogService.getMyProduct(id);
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   createProduct(@Body(new ZodValidationPipe(CreateProductSchema)) dto: CreateProductDto) {
