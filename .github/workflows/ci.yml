@@ -86,7 +86,12 @@ jobs:
           script: |
             set -e
             cd /opt/dorify-v2
-            git pull origin main
+            # Resilient pull: discard any local changes / untracked files
+            # left on the server (e.g. accidental SSH edits) to keep deploy
+            # idempotent. Workspace rule still forbids editing on the server.
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd
             docker compose build
             docker compose up -d
             sleep 10
