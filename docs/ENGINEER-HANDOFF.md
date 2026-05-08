@@ -1,19 +1,17 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: 2026-05-08.
->
-> **Note:** ссылки на `docs/TEAM-CONSTITUTION.md`, `docs/MULTICARD_API_DOCUMENTATION.md` и `REVIEWER-LOG.md` могут быть untracked в этом коммите — будут добавлены отдельным PR.
+> Updated: **2026-05-08** (Session 2).
 
 ---
 
-## TL;DR
+## ⚡ TL;DR
 
 **Project:** Multi-tenant аптечный маркетплейс (Telegram Mini App). Миграция Express MVC v1 → NestJS DDD v2.
-**State:** `idle`. Production v2 впервые задеплоен 2026-05-07. На 7demo prod-БД пустая.
-**Just shipped:** AES-256-GCM encryption + real Multicard adapter (PR #4).
-**Next concrete deliverable:** Phase 4 closure — OFD order-time validation + reconciliation cron + IP whitelist callback guard + JwtAuthGuard wire.
-**Captain language:** русский. Выдаёт directive-style. Устаёт от ceremony — сам triggers `/selfcheck` если нужна перепроверка.
+**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz`. БД пустая (нет seed data).
+**Captain language:** русский, directive-style. Устаёт от ceremony.
+**Last session shipped:** 6 PR (#5–#10) — frontend payment flow, pharmacy products CRUD, CI hardening, bot+CORS hot-fixes.
+**Pause taken:** 2026-05-08. **Next session: DESIGN PASS** — UI polish (см. `docs/design/POLISH_PLAN.md`).
 
 ---
 
@@ -36,7 +34,7 @@
 ### Tone
 - Output язык — русский (Captain's preference).
 - Default mode — **simple** (1-2 строки + аналогия + action). Full mode только на security/financial/architectural/explicit «разверни».
-- **Запрещены:** «выглядит хорошо», «должно работать», «также», «при этом», эмодзи, восклицательные.
+- **Запрещены:** «выглядит хорошо», «должно работать», «также», «при этом», эмодзи в outputs, восклицательные.
 - Сложные термины — простыми словами с аналогиями. Captain ценит «объясни как для бабушки».
 
 ### Decision space
@@ -52,6 +50,7 @@
 - **Перед кодом — `/codex` skill** для bootstrap стандартов (workspace CLAUDE.md правило).
 - **Atomic commits, conventional prefixes**, Co-Authored-By trailer ОБЯЗАТЕЛЕН.
 - **Branch + PR flow для non-trivial.** Direct push в main допустим только с explicit Captain approve.
+- **SSH на сервер — для логов / диагностики / config-edit (env files).** **НЕ для editing код.** В этой сессии Captain explicitly разрешил Engineer SSH-ить для env edits + docker compose ops при ops issues.
 
 ---
 
@@ -60,33 +59,55 @@
 | Фаза | Что | Статус (2026-05-08) | Что осталось |
 |---|---|---|---|
 | 0 | Foundation (repo, pnpm, NestJS, Prisma, CI/CD) | ✅ 100% | — |
-| 1 | IAM Module | ⚠️ ~95% | JwtAuthGuard wire (dead code сейчас), admin creds в env вместо hardcode |
-| 2 | Catalog Module | ✅ ~95% | StockDomainService — поведение в Product, можно оставить |
+| 1 | IAM Module | ⚠️ ~95% | JwtAuthGuard wire (пока dead code), admin creds в env |
+| 2 | Catalog Module | ✅ ~98% | + `getMyProduct` endpoint (PR #8) ✓; status filter в DTO ✓ |
 | 3 | Ordering Module | ⚠️ ~90% | Admin order controller отсутствует |
-| 4 | Payment Module | ⚠️ ~70% | OFD order-time validation, ReconcilePayments cron, CallbackIpGuard, integration tests |
-| 5 | Frontend | ⚠️ ~30% | Pharmacy panel (заглушка), `/payment/success` page + polling, i18n, admin SPA |
-| 6 | Bot + Notifications | ⚠️ ~50% | Pharmacy registration wizard (Grammy conversations), API↔bot integration |
-| 7 | Search (Avi) | ⚠️ ~30% | Qdrant→pgvector переход (Captain decision), Product события chain (Product не AggregateRoot), frontend AI search UI |
-| 8 | Audit + Security + Migrate | ⚠️ ~10% | AuditInterceptor, rate limiting, input sanitization, **AES encryption ✅ done**, миграция v1→v2, parallel run, DNS cutover |
+| 4 | Payment Module | ⚠️ ~85% | Frontend payment flow ✓ (PR #6); WEB_URL env ✓; OFD order-time validation, ReconcilePayments cron, CallbackIpGuard, Idempotency-Key + retry в adapter — **остаются** |
+| 5 | Frontend | ⚠️ ~60% | Pharmacy products CRUD ✓ (PR #8); `/payment/result` polling ✓ (PR #6); **UI polish ⏳ next session**; pharmacy orders list, payment-settings, profile — TODO; Admin SPA — TODO |
+| 6 | Bot + Notifications | ⚠️ ~50% | WEBAPP_URL default fix ✓ (PR #9); pharmacy registration wizard — TODO |
+| 7 | Search (Avi) | ⚠️ ~30% | Qdrant→pgvector переход (Captain decision), Product события chain, frontend AI search UI |
+| 8 | Audit + Security + Migrate | ⚠️ ~15% | AES encryption ✓; CI resilient deploy ✓ (PR #7); CORS prod-default ✓ (PR #10); миграция v1→v2 — TODO; AuditInterceptor, rate limiting, input sanitization — TODO |
 
-**Roadmap до cutover:** ~12-15 рабочих дней (per моя [Tier 1-4 priorities](#priorities-для-cutover)).
+**Roadmap до cutover:** ~10-13 рабочих дней (после design pass + Phase 4 closure + admin SPA + migration).
 
 ---
 
-## Что недавно сделано (последняя сессия 2026-05-07)
+## Что отгружено в этой сессии (Session 2 — 2026-05-08)
 
-5 PR смерджено в один день (с нуля до live в проде):
+| PR | Содержание | Размер |
+|---|---|---|
+| #5 | `docs: ENGINEER-HANDOFF for cross-session continuity` | +259 LOC |
+| #6 | `feat: frontend payment flow with Multicard checkout + status polling` | +235/-6 LOC |
+| #7 | `ci: resilient deploy — reset --hard origin/main before docker build` | +6/-1 LOC |
+| #8 | `feat: pharmacy products CRUD UI` | +1147/-28 LOC |
+| #9 | `fix(bot): default WEBAPP_URL → app.dorify.uz (v2 frontend)` | +1/-1 LOC |
+| #10 | `fix(api): default ALLOWED_ORIGINS → production TWA + admin domains` | +5/-2 LOC |
 
-1. **PR #1** `chore: remove unused @nestjs/cqrs dep + REVIEWER-LOG.md baseline` — cleanup chore.
-2. **PR #2** `fix: allow pnpm 10 build scripts + harden CI deploy` — `pnpm.onlyBuiltDependencies` config + `set -e` в CI deploy script.
-3. **PR #3** `fix: pin Dockerfile pnpm to v10` — Dockerfile использовал `pnpm@latest` (=11), config field не подхватывался. Pin v10 решило.
-4. **PR #4** `feat: AES-256-GCM encryption + real Multicard adapter` — основной feature.
+### Хроника инцидентов
 
-**Production v2 впервые live** на `https://api.dorify.uz/api/v1/health`.
+1. **CI deploy fail post-PR-#6 merge.** На сервере `/opt/dorify-v2/` имел ручные local-changes от прошлого SSH-вмешательства, `git pull` упал. Recovery: `git reset --hard origin/main && git clean -fd` → manual `docker compose build && up -d`. **Permanent fix:** PR #7 (resilient deploy в CI script).
 
-**Incident в этот же день:** ENCRYPTION_KEY env var на сервере не был set до merge → backend crashed в restart loop → 502 на api.dorify.uz. Captain manually добавил ключ в prod `.env` через ssh + `docker compose up -d` → восстановлено.
+2. **Bot указывал на v1.** Default `WEBAPP_URL=https://dorify.uz` (v1 landing) в `apps/bot/src/config/index.ts`. Captain заметил smoke-test'ом. **Fix:** PR #9 default → `https://app.dorify.uz`. Также: env _file для bot — `./apps/bot/.env`, **не** общий `/opt/dorify-v2/.env` (см. `docker-compose.yml:39`).
 
-**Lesson:** action items до merge ENFORCEABLE — не просто listing в PR description. В будущем — фиксить fail-soft fallback ИЛИ blocking pre-merge check на server-side env-vars.
+3. **CORS «Network Error» в browser.** Default `ALLOWED_ORIGINS='*'` несовместим с `credentials:true`. На сервере env содержал старый список без `app.dorify.uz`. **Fix env:** Engineer SSH-ом sed-нул env + `docker compose up -d --force-recreate dorify-backend` (`restart` НЕ перечитывает env_file). **Code fix:** PR #10 default → prod-домены явно.
+
+### Производственные доступы (что точно сейчас работает)
+
+- `https://api.dorify.uz/api/v1/health` → `{status:ok,service:dorify-api}`
+- `https://app.dorify.uz/` → v2 TWA (HomePage с banner Dorify, search, chips категорий, grid товаров — пустой т.к. БД пустая)
+- `https://app.dorify.uz/pharmacy` → 4-card hub
+- `https://app.dorify.uz/pharmacy/products` → list page (требует Telegram WebApp + pharmacy_owner в БД, в browser возвращает 401 — норма)
+- `https://app.dorify.uz/payment/result?orderId=...` → polling page
+- Telegram bot `/start` → кнопки «Открыть маркетплейс» / «Панель аптеки» открывают app.dorify.uz
+- CORS allowed origins: `app.dorify.uz`, `pharmacy.dorify.uz`, `admin.dorify.uz`
+
+### Известные функциональные ограничения
+
+- БД пустая. Нет товаров, аптек, юзеров. Smoke test реального flow требует seed.
+- Pharmacy panel в обычном браузере недоступен (нет Telegram initData → 401).
+- Multi-pharmacy cart на checkout «degraded» — N invoices, не split. Решение — Multicard split-pivot, см. `docs/multicard-1/README.md`.
+- Order panel для аптеки и Admin SPA отсутствуют.
+- `apps/bot/.env` ≠ `/opt/dorify-v2/.env` — env-edits для бота нужны в первом файле, контейнер требует force-recreate (не restart).
 
 ---
 
@@ -94,18 +115,25 @@
 
 ### Production server (7demo)
 - SSH alias: `ssh 7demo` (host/port/user/key — в Captain's password manager под «Dorify v2 — 7demo SSH»; в `~/.ssh/config` локально).
-- Project path, DB name, Caddy routes — публичные домены: `api.dorify.uz`, `app.dorify.uz`, `dorify.uz`, `admin.dorify.uz`. Конкретные пути/имена БД — в password manager.
+- **Engineer может SSH-ить** для логов / docker-ops / env edits. **НЕ для editing кода** — это через git push only.
 
-**ВАЖНО:** SSH только для логов / диагностики / config-edit. **НЕ ПРАВИТЬ КОД на сервере** — workspace rule. Code только через `git push → CI → CD`.
+### Production env vars
 
-### Production env vars (на сервере, `.env`)
-Названия переменных (значения — в Captain's password manager / GitHub Secrets):
+**Backend (`/opt/dorify-v2/.env`)** — read by `dorify-backend` контейнер:
 - `DATABASE_URL` — postgres connection
 - `JWT_SECRET` — 32+ chars
-- `BOT_TOKEN` — Telegram bot
-- **`ENCRYPTION_KEY`** — 64 hex chars (32 bytes), set 2026-05-07. **ПОТЕРЯ = unrecoverable secrets.** Хранится в password manager под именем «Dorify v2 — ENCRYPTION_KEY (production)».
+- `BOT_TOKEN` — Telegram bot token (тот же что в `apps/bot/.env`)
+- **`ENCRYPTION_KEY`** — 64 hex chars (32 bytes), set 2026-05-07. **ПОТЕРЯ = unrecoverable secrets.** Хранится в password manager.
 - `MULTICARD_API_URL` — default sandbox; для prod merchant-а override на prod URL.
 - `MULTICARD_CALLBACK_URL` — opt., default `https://api.dorify.uz/api/v1/payments/callback`.
+- `WEB_URL` — default `https://app.dorify.uz` (PR #6); фронт-домен куда возвращается user после Multicard checkout.
+- `ALLOWED_ORIGINS` — после PR #10 default включает app/pharmacy/admin .dorify.uz; env override опционален.
+
+**Bot (`/opt/dorify-v2/apps/bot/.env`)** — read by `dorify-bot` контейнер:
+- `BOT_TOKEN`
+- `WEBAPP_URL` — после PR #9 default `https://app.dorify.uz`; явный override желателен.
+- `HEALTH_PORT` — default 3002
+- `ADMIN_CHAT_IDS`
 
 ### Local toolchain
 ```
@@ -123,9 +151,13 @@ pnpm --filter @dorify/api prisma:generate
 Локально → git push → CI (lint+test+build) → CD (SSH deploy) → 7demo Production
 ```
 
-**Iron Law #5:** CI red blocks ship. CI deploy script — `.github/workflows/ci.yml` lines 74-95.
+**Iron Law #5:** CI red blocks ship.
+
+CI deploy script (`.github/workflows/ci.yml:74-95`) после PR #7 устойчив к accidental SSH-edits на сервере: `git fetch + reset --hard origin/main + git clean -fd` перед docker build.
 
 После merge в `main` — auto deploy. Health check `wget -qO- http://localhost:3001/api/v1/health` обязателен.
+
+**Ловушка:** `docker compose restart` НЕ перечитывает `env_file`. После env-edit на сервере → `docker compose up -d --force-recreate <service>`.
 
 ---
 
@@ -150,91 +182,121 @@ Codex стандарты в `~/Codex/standards/`:
 
 ## Open decisions (Captain's pending)
 
-1. **4.7 frontend payment flow** — deferred. Когда дойдёт до Tier 2 — спроси «redirect Multicard checkout vs embedded?»
-2. **Admin SPA** — строить заново vs адаптировать v1. Зависит от приоритета Tier 3.
-3. **Pharmacy registration mechanism** — Bot wizard (Grammy conversations) основной канал. Web-based registration через Telegram Mini App — открытый.
-4. **Migration v1→v2** — extraction скрипт для users / pharmacies / products / orders / payments + re-encrypt Multicard secrets под новый ENCRYPTION_KEY. План на отдельный sprint в Phase 8.
+1. **Multicard architectural pivot** — per-pharmacy merchant (current) vs platform-as-merchant + split. Captain выбрал pivot 2026-05-08, **поставил Multicard на паузу** до получения операционных ответов от Multicard support (PDF inquiry на `~/Desktop/marketplace-payment-inquiry.pdf`). См. `docs/multicard-1/README.md`.
+2. **Admin SPA** — строить заново vs адаптировать v1.
+3. **Pharmacy registration mechanism** — Bot wizard (Grammy conversations) основной канал. Web-based registration через TMA — открытый.
+4. **Migration v1→v2** — extraction скрипт. План на отдельный sprint в Phase 8.
+5. **Seed data для production** — нужен для real smoke testing. Manual SQL vs proper seed script vs migration v1→v2 — не решено.
 
-## Captain decisions log (закрыто на 2026-05-07)
+## Captain decisions log (closed по 2026-05-08)
 
 - pgvector (vs Qdrant) — vector store
-- service-per-module (vs CQRS) — pattern (не используется `@nestjs/cqrs`, удалён)
+- service-per-module (vs CQRS) — pattern (`@nestjs/cqrs` удалён)
 - env-vars + JWT wire (vs AdminUser table) — admin auth
-- cron-only reconciliation (вариант a)
-- AES-256-GCM, key из env — encryption
+- cron-only reconciliation
+- AES-256-GCM, key из env — encryption (PR #4)
 - OFD optional на Product, validation at order time когда Multicard active
-- Multicard signature `MD5(store_id + invoice_id + amount + secret)`, primary source `docs/MULTICARD_API_DOCUMENTATION.md:281`
-- Multicard sandbox `dev-mesh.multicard.uz` для CI/dev, prod `mesh.multicard.uz`
-- Multicard callback IP whitelist `195.158.26.90` (canonical), env `MULTICARD_CALLBACK_IPS`-overridable
+- Multicard signature `MD5(store_id + invoice_id + amount + secret)` — primary source `docs/MULTICARD_API_DOCUMENTATION.md:281`
+- Multicard sandbox `dev-mesh.multicard.uz` для dev, prod `mesh.multicard.uz`
+- Multicard callback IP whitelist `195.158.26.90` (canonical), env-overridable
+- Frontend payment flow: redirect Multicard checkout (PR #6) — embedded НЕ выбрали
+- Pharmacy products CRUD UI: free-form categories с datalist, nested routing, default-all status filter, confirm-dialog delete (PR #8)
+- Multicard architectural model: pivot на platform-as-merchant + split (deferred до операционных ответов)
 
-Все decisions — в `REVIEWER-LOG.md` Session 1 как Tier 1 anchor.
+Все decisions — в `REVIEWER-LOG.md`.
 
 ---
 
-## Priorities для cutover
+## Priorities для cutover (после design pass)
 
-**Tier 1: Buyer может купить лекарство (3-4 дня)**
+**Tier 1: Buyer может купить лекарство**
 1. ✅ AES + real Multicard backend (PR #4)
-2. ⏳ **Frontend `/payment/success` page + polling статуса оплаты** ← **ближайший deliverable**
-3. ⏳ OFD order-time validation + reconciliation cron + IP whitelist (объединённый PR)
+2. ✅ Frontend payment flow (PR #6)
+3. ⏳ **Phase 4 closure:** OFD order-time validation + reconciliation cron + IP whitelist guard + Idempotency-Key/retry в adapter (см. `docs/multicard-1/README.md` §8)
 
-**Tier 2: Аптека может работать в v2 (5-7 дней)**
-4. Pharmacy panel — products CRUD UI (~3 дня, sales-blocking)
-5. Pharmacy panel — payment-settings UI (Multicard credentials)
-6. Pharmacy panel — orders list + profile edit
-7. Bot pharmacy registration wizard (Grammy conversations)
+**Tier 2: Аптека может работать в v2**
+4. ✅ Pharmacy panel — products CRUD UI (PR #8)
+5. ⏳ Pharmacy panel — payment-settings UI (Multicard credentials)
+6. ⏳ Pharmacy panel — orders list + profile edit
+7. ⏳ Bot pharmacy registration wizard (Grammy conversations)
 
-**Tier 3: Админ может работать (3-4 дня)**
-8. env-vars admin creds + JwtAuthGuard wire + Admin SPA (login, product moderation, pharmacy verify, orders/payments view)
+**Tier 3: Админ может работать**
+8. ⏳ env-vars admin creds + JwtAuthGuard wire + Admin SPA
 
-**Tier 4: Cutover (3 дня)**
-9. Data migration script v1→v2 (users / pharmacies / products / orders / payments + re-encrypt Multicard secrets)
-10. Параллельный запуск + smoke
-11. DNS switch + monitor 24h
+**Tier 4: Cutover**
+9. ⏳ Data migration script v1→v2
+10. ⏳ Параллельный запуск + smoke
+11. ⏳ DNS switch + monitor 24h
 
 ---
 
-## Next concrete action (Tier 1 #2 / #3)
+## ⏭ Next session — DESIGN PASS
 
-Captain предложил Tier 1 #1 завершён. Следующая логичная задача:
+Captain explicit (2026-05-08, end of session 2):
+> «Пауза. Изучи всю документацию ... начнем с дизайна.»
 
-**Option A — Tier 1 #2 (frontend payment success page)** ~1 день. Без него backend payment в вакууме, пользователь не может завершить оплату в UI. Зависимость: backend Multicard real (✓ готов).
+Полный план + scope: **`docs/design/POLISH_PLAN.md`**.
 
-**Option B — Tier 1 #3 (Phase 4 closure: OFD validation + reconciliation cron + IP whitelist + JWT wire)** ~1-2 дня. Backend-only, не блокирует пользователя на surface, но необходим до cutover. Зависимость: AES + Multicard real (✓ готов).
+Краткое summary:
+- Pages to redesign: HomePage, ProductsListPage, ProductFormPage, PharmacyHomePage, PaymentResultPage, CheckoutPage.
+- Components: cards с shadows + hover, status pills с иконками, skeletons вместо Spinner, empty-states с illustration tone.
+- Bottom navigation: иконки SF Symbols-style (сейчас есть базовые иконки, можно улучшить).
+- Color/typography hierarchy + spacing rhythm.
+- НЕ trogать: telegram-ui core (используем как base), backend logic.
+- Estimate: ~2-3 дня на качественный pass.
 
-Recommend **Option B** первым — closure Phase 4 одним блоком, frontend Tier 1 #2 — после.
+После design pass — снова открыты Tier 1 #3 (Phase 4 closure), Tier 2 #5/#6/#7, Tier 3 #8.
 
 ---
 
 ## Files & paths reference
 
 ### Backend (`apps/api/`)
-- `src/main.ts` — bootstrap, `/api/v1` global prefix
-- `src/app.module.ts` — root module
-- `src/core/` — config, database, crypto, filters, interceptors
-- `src/core/crypto/encryption.service.ts` — AES-256-GCM (use through `@Inject(EncryptionService)`)
-- `src/core/config/env.config.ts` — Zod-validated env
+- `src/main.ts` — bootstrap, CORS (origin: config.ALLOWED_ORIGINS), `/api/v1` global prefix, helmet
+- `src/app.module.ts` — root module, ThrottlerModule (100/min globally — может конфликтовать с Multicard callback burst, см. `docs/multicard-1/README.md` §8.4)
+- `src/core/config/env.config.ts` — Zod-validated env (после PR #10 ALLOWED_ORIGINS default явный)
+- `src/core/crypto/encryption.service.ts` — AES-256-GCM
 - `src/modules/{iam,catalog,ordering,payment,search,notification}/` — bounded contexts
-- `src/modules/payment/infrastructure/multicard/multicard.adapter.ts` — реальная HTTP интеграция
-- `src/shared/domain/` — BaseEntity, AggregateRoot, ValueObject, DomainEvent, DomainError
+- `src/modules/payment/infrastructure/multicard/multicard.adapter.ts` — Multicard HTTP интеграция (без retry/idempotency-key — см. multicard-1 README)
+- `src/modules/payment/application/payment.service.ts` — createInvoice + processCallback (race-fix через markPaidAtomically)
+- `src/modules/catalog/application/catalog.service.ts` — Pharmacy CRUD; `getMyProduct` (PR #8)
+- `src/modules/catalog/infrastructure/controllers/product.controller.ts` — Public/Pharmacy/Admin controllers
 - `src/shared/infrastructure/tenant/tenant.context.ts` — AsyncLocalStorage tenant scoping
-- `prisma/schema.prisma` — schema (postgres17 + pgvector planned)
-- `test/jest-setup.ts` — env vars для tests
+- `prisma/schema.prisma` — schema
 
 ### Frontend (`apps/web/`)
-- React 19 + Vite + Tailwind + tanstack-query + Zustand
-- `src/features/checkout/ui/CheckoutPage.tsx` — нужно integration с `/payment/success`
-- `src/features/pharmacy-panel/ui/PharmacyPanelPage.tsx` — заглушка, ждёт Tier 2
+- `src/app/router.tsx` — routes (HomePage, ProductPage, SearchPage, CartPage, CheckoutPage, **PaymentResultPage** (PR #6), OrdersPage, PharmacyPanelPage)
+- `src/app/Layout.tsx` — Layout с bottom nav (Главная/Поиск/Корзина/Заказы)
+- `src/features/checkout/ui/CheckoutPage.tsx` — single-pharmacy → paymentsApi.create → window.location → Multicard
+- `src/features/payment/ui/PaymentResultPage.tsx` — polling 2s, 60s timeout, UI states
+- `src/features/pharmacy-panel/ui/PharmacyPanelPage.tsx` — Layout с nested Routes (PR #8)
+- `src/features/pharmacy-panel/ui/PharmacyHomePage.tsx` — 4-card hub (PR #8)
+- `src/features/pharmacy-panel/ui/products/ProductsListPage.tsx` — list + filters + delete confirm (PR #8)
+- `src/features/pharmacy-panel/ui/products/ProductFormPage.tsx` — loader + inner form, OFD accordion (PR #8)
+- `src/features/pharmacy-panel/ui/products/components/{ProductCard,ProductStatusBadge}.tsx` (PR #8)
+- `src/shared/api/{client,products,orders,payments,pharmacyProducts}.ts` — API helpers
+- `src/shared/types/index.ts` — Product (с moderationNote, packageCode после PR #8)
+- `src/vite-env.d.ts` — TelegramWebApp typings (включая openLink после PR #6)
 
 ### Bot (`apps/bot/`)
-- Grammy — minimal с /start /help. Pharmacy wizard ожидается в Tier 2.
+- `src/config/index.ts` — Zod env (`WEBAPP_URL` default `https://app.dorify.uz` после PR #9)
+- `src/keyboards/index.ts` — кнопки `mainMenuKeyboard` шлют на `${WEBAPP_URL}` и `${WEBAPP_URL}/pharmacy`
+- `src/commands/index.ts` — /start, /help, callback queries
+
+### CI/CD
+- `.github/workflows/ci.yml` — lint+test+build job + deploy job (resilient pull после PR #7)
 
 ### Docs
 - `docs/DORIFY_V2_DDD.md` — full design doc, 1525 строк, §10 phase plan
-- `docs/MULTICARD_API_DOCUMENTATION.md` — Multicard API reference (line 281 — signature формула)
+- `docs/MULTICARD_API_DOCUMENTATION.md` — Multicard API reference
 - `docs/TEAM-CONSTITUTION.md` v1.3 — operating manual
 - `docs/ENGINEER-HANDOFF.md` — этот файл
+- `docs/multicard-1/README.md` — Multicard integration context (1045 строк): API концепции, текущее состояние реализации, регрессии vs v1, архитектурный pivot, Phase 4 closure план, open questions
+- **`docs/design/POLISH_PLAN.md`** — план design pass для следующей сессии
 - `REVIEWER-LOG.md` — Reviewer calibration + Captain decisions log
+
+### Outgoing artifacts
+- `~/Desktop/marketplace-payment-inquiry.pdf` — generic 1-page A4 inquiry для Multicard / Click / Payme / Uzum support о split feature.
 
 ---
 
@@ -244,14 +306,21 @@ Recommend **Option B** первым — closure Phase 4 одним блоком,
 # 1. Read state
 cat .claude/workflow-state.json
 
-# 2. Read this handoff (this file)
+# 2. Read this handoff
+cat docs/ENGINEER-HANDOFF.md
 
-# 3. Read REVIEWER-LOG.md (Captain decisions + Reviewer calibration)
+# 3. If next-up = design pass → читай docs/design/POLISH_PLAN.md
+cat docs/design/POLISH_PLAN.md
+
+# 4. If next-up = Multicard → читай docs/multicard-1/README.md
+cat docs/multicard-1/README.md
+
+# 5. Read REVIEWER-LOG.md (Captain decisions)
 cat REVIEWER-LOG.md
 
-# 4. Skim TEAM-CONSTITUTION.md v1.3 if cold-start
+# 6. Skim TEAM-CONSTITUTION.md v1.3 if cold-start
 
-# 5. Confirm to Captain: «контекст загружен, state X, next-up Y, готов»
+# 7. Confirm to Captain: «контекст загружен, state X, next-up Y, готов»
 ```
 
 ---
