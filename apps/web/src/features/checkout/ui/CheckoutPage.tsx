@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useCartStore, selectTotalPrice, selectItemsByPharmacy } from '@shared/stores/cartStore';
 import { ordersApi } from '@shared/api/orders';
+import { paymentsApi } from '@shared/api/payments';
 import { PriceTag } from '@shared/ui/PriceTag';
+import type { Order } from '@shared/types';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -32,13 +34,20 @@ export default function CheckoutPage() {
     };
   }, [navigate]);
 
+  type CheckoutResult =
+    | { kind: 'redirect'; checkoutUrl: string }
+    | { kind: 'orders' };
+
   const mutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<CheckoutResult> => {
       // Create order per pharmacy
       const pharmacyIds = Array.from(itemsByPharmacy.keys());
+      const isSinglePharmacy = pharmacyIds.length === 1;
+      const createdOrders: Order[] = [];
+
       for (const pharmacyId of pharmacyIds) {
         const pharmacyItems = itemsByPharmacy.get(pharmacyId)!;
-        await ordersApi.place({
+        const order = await ordersApi.place({
           pharmacyId,
           items: pharmacyItems.map((i) => ({
             productId: i.product.id,
@@ -48,11 +57,37 @@ export default function CheckoutPage() {
           contactPhone: phone,
           deliveryAddress: deliveryType === 'DELIVERY' ? address : undefined,
         });
+        createdOrders.push(order);
         clearPharmacy(pharmacyId);
       }
+
+      // Multi-pharmacy carts: skip payment trigger for now (Tier 2 will revisit)
+      if (!isSinglePharmacy || !createdOrders[0]) {
+        return { kind: 'orders' };
+      }
+
+      const payment = await paymentsApi.create(createdOrders[0].id);
+      if (!payment.checkoutUrl) {
+        throw new Error('Не получилось получить ссылку оплаты');
+      }
+      if (!payment.checkoutUrl.startsWith('https://')) {
+        throw new Error('Неподдерживаемая ссылка оплаты');
+      }
+      return { kind: 'redirect', checkoutUrl: payment.checkoutUrl };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result.kind === 'redirect') {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
       navigate('/orders');
+    },
+    onError: () => {
+      // Order(s) могли быть созданы до payment failure (cart cleared per pharmacy внутри loop).
+      // Если cart после fail оказался пуст — все orders созданы, ведём на /orders для retry.
+      if (useCartStore.getState().items.length === 0) {
+        navigate('/orders');
+      }
     },
   });
 
@@ -132,7 +167,9 @@ export default function CheckoutPage() {
       {mutation.isError && (
         <div className="px-4 mt-3">
           <div className="bg-dorify-secondary-light text-dorify-secondary text-sm p-3 rounded-xl">
-            Ошибка при создании заказа. П��пробуйте ещё раз.
+            {mutation.error instanceof Error
+              ? mutation.error.message
+              : 'Не удалось завершить оформление. Откройте «Мои заказы».'}
           </div>
         </div>
       )}
