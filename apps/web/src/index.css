@@ -28,3 +28,8 @@ body {
 .text-tg { color: var(--tg-theme-text-color, #000000); }
 .text-tg-hint { color: var(--tg-theme-hint-color, #707579); }
 .text-tg-link { color: var(--tg-theme-link-color, #007AFF); }
+
+/* @telegram-apps/telegram-ui Tabbar — match body bg (CSS module class is hashed but starts with "Tabbar_") */
+[class*="Tabbar_wrapper"] {
+  background: var(--tg-theme-secondary-bg-color, #EFEFF4) !important;
+}

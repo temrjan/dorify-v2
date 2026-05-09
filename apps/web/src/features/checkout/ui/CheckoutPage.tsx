@@ -175,7 +175,7 @@ export default function CheckoutPage() {
       )}
 
       {/* Submit */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-tg-bg shadow-sheet pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-tg-secondary shadow-sheet pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <Button
           mode="filled"
           size="l"
