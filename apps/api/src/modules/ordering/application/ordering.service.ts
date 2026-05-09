@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { generateId } from '@shared/domain';
 import { ORDER_REPOSITORY } from '../domain/repositories/order.repository';
 import type { OrderRepository } from '../domain/repositories/order.repository';
 import { PRODUCT_REPOSITORY } from '../../catalog/domain/repositories/product.repository';
@@ -45,7 +46,7 @@ export class OrderingService {
       }
 
       orderItems.push(OrderItem.create({
-        id: this.generateCuid(),
+        id: generateId(),
         productId: product.getId(),
         productName: product.name,
         quantity: item.quantity,
@@ -55,7 +56,7 @@ export class OrderingService {
 
     // 2. Create Order (Aggregate Root)
     const order = Order.create({
-      id: this.generateCuid(),
+      id: generateId(),
       pharmacyId: dto.pharmacyId,
       buyerId,
       items: orderItems,
@@ -179,9 +180,4 @@ export class OrderingService {
     };
   }
 
-  private generateCuid(): string {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);
-    return `c${timestamp}${random}`;
-  }
 }

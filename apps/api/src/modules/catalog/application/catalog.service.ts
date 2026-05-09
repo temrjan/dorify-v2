@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
+import { generateId } from '@shared/domain';
 import { PRODUCT_REPOSITORY } from '../domain/repositories/product.repository';
 import type { ProductRepository } from '../domain/repositories/product.repository';
 import { Product } from '../domain/entities/product.entity';
@@ -24,7 +25,7 @@ export class CatalogService {
     const pharmacyId = TenantContext.requirePharmacyId();
 
     const product = Product.create({
-      id: this.generateCuid(),
+      id: generateId(),
       pharmacyId,
       name: dto.name,
       description: dto.description,
@@ -199,9 +200,4 @@ export class CatalogService {
     };
   }
 
-  private generateCuid(): string {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);
-    return `c${timestamp}${random}`;
-  }
 }

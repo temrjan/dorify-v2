@@ -4,6 +4,7 @@ import { Reflector } from '@nestjs/core';
 import { createHmac } from 'crypto';
 import { IS_PUBLIC_KEY } from '@common/decorators/public.decorator';
 import { config } from '@core/config/env.config';
+import { generateId } from '@shared/domain';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
 import type { UserRepository } from '../../domain/repositories/user.repository';
 import { TelegramId } from '../../domain/value-objects/telegram-id.vo';
@@ -53,6 +54,9 @@ export class TelegramAuthGuard implements CanActivate {
     request.user = {
       id: user.getId(),
       telegramId: user.telegramId.value.toString(),
+      firstName: user.firstName,
+      lastName: user.lastName,
+      username: user.username,
       role: user.role,
       pharmacyId: user.pharmacyId,
     };
@@ -130,7 +134,7 @@ export class TelegramAuthGuard implements CanActivate {
 
     // Create new user
     const user = User.create({
-      id: this.generateCuid(),
+      id: generateId(),
       telegramId,
       firstName: telegramUser.first_name,
       lastName: telegramUser.last_name,
@@ -142,12 +146,5 @@ export class TelegramAuthGuard implements CanActivate {
     this.logger.log(`New user registered: ${user.displayName} (${telegramUser.id})`);
 
     return user;
-  }
-
-  private generateCuid(): string {
-    // Simple cuid-like ID generation
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);
-    return `c${timestamp}${random}`;
   }
 }

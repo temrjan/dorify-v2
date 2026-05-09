@@ -21,10 +21,21 @@ const EnvSchema = z.object({
   ENCRYPTION_KEY: z
     .string()
     .regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be 64 hex chars (32 bytes for AES-256)'),
-  INIT_DATA_TTL_SECONDS: z.coerce.number().default(86400),
+  // Telegram initData TTL — default 5 min (300 s). Audit S-HIGH-1: prior
+  // 24h window meant intercepted initData (XSS/network-sniffing) usable for
+  // a full day. Telegram clients refresh initData on each WebApp open;
+  // 5 min covers session active use.
+  INIT_DATA_TTL_SECONDS: z.coerce.number().default(300),
   // Service token for bot → admin endpoints (verify/reject pharmacy).
   // Generate via `openssl rand -hex 32` and share between api + bot env.
   ADMIN_SERVICE_TOKEN: z.string().min(32, 'ADMIN_SERVICE_TOKEN must be ≥32 chars'),
+  // Admin login credentials — было hardcoded в iam.service.ts (audit
+  // S-CRIT-1). bcrypt-hashed password (cost ≥10). Generate hash:
+  //   node -e "console.log(require('bcryptjs').hashSync('mypass', 10))"
+  ADMIN_USERNAME: z.string().min(1).default('admin'),
+  ADMIN_PASSWORD_HASH: z
+    .string()
+    .regex(/^\$2[ayb]\$\d{2}\$.{53}$/, 'ADMIN_PASSWORD_HASH must be a bcrypt hash'),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;

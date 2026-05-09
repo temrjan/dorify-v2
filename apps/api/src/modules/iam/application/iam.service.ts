@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { config } from '@core/config/env.config';
+import { generateId } from '@shared/domain';
 import { EncryptionService } from '@core/crypto/encryption.service';
 import { USER_REPOSITORY } from '../domain/repositories/user.repository';
 import type { UserRepository } from '../domain/repositories/user.repository';
@@ -13,10 +14,6 @@ import { PhoneNumber } from '../domain/value-objects/phone-number.vo';
 import { PharmacyCreatedEvent, PharmacyVerifiedEvent, PharmacyRejectedEvent } from '../domain/events';
 import type { CreatePharmacyDto, UpdatePharmacyDto, UpdatePaymentSettingsDto, PharmacyResponse, PaymentSettingsResponse, SlugAvailabilityResponse } from './dto/pharmacy.dto';
 import type { AdminLoginDto, AuthResponse } from './dto/auth.dto';
-
-// Temporary admin credentials (should be in DB in production)
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD_HASH = bcrypt.hashSync('dorify2026!secure', 10);
 
 @Injectable()
 export class IamService {
@@ -30,11 +27,11 @@ export class IamService {
   ) {}
 
   async adminLogin(dto: AdminLoginDto): Promise<AuthResponse> {
-    if (dto.username !== ADMIN_USERNAME) {
+    if (dto.username !== config.ADMIN_USERNAME) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const valid = await bcrypt.compare(dto.password, ADMIN_PASSWORD_HASH);
+    const valid = await bcrypt.compare(dto.password, config.ADMIN_PASSWORD_HASH);
     if (!valid) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -65,7 +62,7 @@ export class IamService {
     }
 
     const pharmacy = Pharmacy.create({
-      id: this.generateCuid(),
+      id: generateId(),
       ownerId,
       name: dto.name,
       slug: dto.slug,
@@ -243,9 +240,4 @@ export class IamService {
     };
   }
 
-  private generateCuid(): string {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);
-    return `c${timestamp}${random}`;
-  }
 }
