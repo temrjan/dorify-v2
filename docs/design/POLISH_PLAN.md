@@ -1,9 +1,11 @@
 # Design Pass — UI Polish Plan
 
 > Создан 2026-05-08 в финале Session 2.
-> **Session 3 (2026-05-09): большая часть scope выполнена** — см. ✅ маркеры
-> ниже. PR #12-#22 закрыли foundation, HomePage, BottomNav, pharmacy pages,
-> theme system, profile, cart, catalog. Что осталось — отмечено ⏳.
+> **Session 3 Day 1-2 (2026-05-09): большая часть scope выполнена** — PR #12-#22
+> закрыли foundation, HomePage, BottomNav, pharmacy pages, theme system,
+> profile, cart, catalog.
+> **Session 3 Day 3 (2026-05-09): scope закрыт полностью** — PR #24, #25.
+> Все blocks ✅, design pass v2 100%.
 
 ## Status (Session 3 close)
 
@@ -20,9 +22,10 @@
 | TabBar bg unification | ✅ PR #17, #19 |
 | iOS safe-area handling | ✅ PR #16, #17 |
 | Seed для visual smoke | ✅ PR #14 |
-| OrdersPage redesign | ⏳ pending (старый стиль) |
-| ProductPage review | ⏳ pending (старый стиль) |
-| Checkout / PaymentResult minor polish | ⏳ pending (sticky bars work, visuals OK) |
+| OrdersPage redesign | ✅ PR #24 (count badge, SkeletonCard, EmptyState, theme-aware divider) |
+| ProductPage review | ✅ PR #24 (inline CTA per Cart lesson, IconPackage placeholder, ProductSkeleton, EmptyState, Pill для «По рецепту») |
+| Checkout / PaymentResult polish | ✅ PR #25 (Checkout: section cards + radio cards с иконками + inline submit; PaymentResult: цветные icon circles + унифицированный ResultView) |
+| StatusBadge unification | ✅ PR #24 (переписан через Pill — coherent с ProductStatusBadge) |
 
 ---
 
