@@ -6,7 +6,58 @@ import { useCartStore, selectTotalPrice, selectItemsByPharmacy } from '@shared/s
 import { ordersApi } from '@shared/api/orders';
 import { paymentsApi } from '@shared/api/payments';
 import { PriceTag } from '@shared/ui/PriceTag';
+import { IconStore, IconPackage, IconAlert } from '@shared/ui/icons';
 import type { Order } from '@shared/types';
+
+type DeliveryType = 'PICKUP' | 'DELIVERY';
+
+interface SectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+function Section({ title, children }: SectionProps) {
+  return (
+    <div className="px-4 mt-4">
+      <Text className="text-xs uppercase tracking-wider text-tg-hint block mb-2 px-1">
+        {title}
+      </Text>
+      <div className="bg-tg-section rounded-card shadow-card p-4">{children}</div>
+    </div>
+  );
+}
+
+interface DeliveryOptionProps {
+  active: boolean;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}
+
+function DeliveryOption({ active, icon, title, description, onClick }: DeliveryOptionProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 p-3 rounded-xl border-2 text-left transition active:scale-[0.98] ${
+        active
+          ? 'border-dorify-primary bg-dorify-primary-light'
+          : 'border-transparent bg-tg-secondary'
+      }`}
+    >
+      <div className={`mb-2 ${active ? 'text-dorify-primary-dark' : 'text-tg-hint'}`}>
+        {icon}
+      </div>
+      <Text
+        className={`text-sm font-medium block ${active ? 'text-dorify-primary-dark' : ''}`}
+      >
+        {title}
+      </Text>
+      <Text className="text-xs text-tg-hint block mt-0.5">{description}</Text>
+    </button>
+  );
+}
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -20,9 +71,8 @@ export default function CheckoutPage() {
     return user ? '+998' : '';
   });
   const [address, setAddress] = useState('');
-  const [deliveryType, setDeliveryType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>('PICKUP');
 
-  // BackButton
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     tg?.BackButton.show();
@@ -40,7 +90,6 @@ export default function CheckoutPage() {
 
   const mutation = useMutation({
     mutationFn: async (): Promise<CheckoutResult> => {
-      // Create order per pharmacy
       const pharmacyIds = Array.from(itemsByPharmacy.keys());
       const isSinglePharmacy = pharmacyIds.length === 1;
       const createdOrders: Order[] = [];
@@ -61,7 +110,6 @@ export default function CheckoutPage() {
         clearPharmacy(pharmacyId);
       }
 
-      // Multi-pharmacy carts: skip payment trigger for now (Tier 2 will revisit)
       if (!isSinglePharmacy || !createdOrders[0]) {
         return { kind: 'orders' };
       }
@@ -83,8 +131,6 @@ export default function CheckoutPage() {
       navigate('/orders');
     },
     onError: () => {
-      // Order(s) могли быть созданы до payment failure (cart cleared per pharmacy внутри loop).
-      // Если cart после fail оказался пуст — все orders созданы, ведём на /orders для retry.
       if (useCartStore.getState().items.length === 0) {
         navigate('/orders');
       }
@@ -96,46 +142,42 @@ export default function CheckoutPage() {
     return null;
   }
 
+  const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
+  const canSubmit = phone.trim().length > 0 && (deliveryType === 'PICKUP' || address.trim().length > 0);
+
   return (
-    <div className="pb-28">
+    <div className="pb-6">
       <div className="px-4 pt-4">
         <Text className="text-lg font-bold">Оформление заказа</Text>
       </div>
 
-      {/* Contact */}
-      <div className="px-4 mt-4 space-y-3">
-        <Text className="text-sm font-medium text-tg-hint">Контактные данные</Text>
+      {/* Контакт */}
+      <Section title="Контакт">
         <Input
-          placeholder="Телефон *"
+          type="tel"
+          placeholder="+998 90 123 45 67"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
         />
-      </div>
+      </Section>
 
-      {/* Delivery */}
-      <div className="px-4 mt-4">
-        <Text className="text-sm font-medium text-tg-hint mb-2">Способ получения</Text>
+      {/* Доставка */}
+      <Section title="Способ получения">
         <div className="flex gap-2">
-          <button
-            className={`flex-1 py-3 rounded-xl text-sm font-medium transition ${
-              deliveryType === 'PICKUP'
-                ? 'bg-dorify-primary text-white'
-                : 'bg-tg-secondary text-tg'
-            }`}
+          <DeliveryOption
+            active={deliveryType === 'PICKUP'}
+            icon={<IconStore width={22} height={22} />}
+            title="Самовывоз"
+            description="Из аптеки"
             onClick={() => setDeliveryType('PICKUP')}
-          >
-            Самовывоз
-          </button>
-          <button
-            className={`flex-1 py-3 rounded-xl text-sm font-medium transition ${
-              deliveryType === 'DELIVERY'
-                ? 'bg-dorify-primary text-white'
-                : 'bg-tg-secondary text-tg'
-            }`}
+          />
+          <DeliveryOption
+            active={deliveryType === 'DELIVERY'}
+            icon={<IconPackage width={22} height={22} />}
+            title="Доставка"
+            description="Курьер"
             onClick={() => setDeliveryType('DELIVERY')}
-          >
-            Доставка
-          </button>
+          />
         </div>
 
         {deliveryType === 'DELIVERY' && (
@@ -147,44 +189,46 @@ export default function CheckoutPage() {
             />
           </div>
         )}
-      </div>
+      </Section>
 
-      {/* Summary */}
-      <div className="px-4 mt-6">
-        <div className="bg-tg-section rounded-xl p-4">
-          <div className="flex justify-between text-sm">
-            <span className="text-tg-hint">Товаров</span>
-            <span>{items.length}</span>
-          </div>
-          <div className="flex justify-between text-sm mt-2">
-            <span className="text-tg-hint">Итого</span>
-            <PriceTag amount={totalPrice} />
-          </div>
+      {/* Заказ */}
+      <Section title="Ваш заказ">
+        <div className="flex justify-between text-sm">
+          <span className="text-tg-hint">Товаров</span>
+          <span>{totalQty} шт</span>
         </div>
-      </div>
+        <div className="h-px bg-tg-secondary my-3" />
+        <div className="flex justify-between items-baseline">
+          <span className="text-tg-hint">Итого</span>
+          <PriceTag amount={totalPrice} className="text-lg" />
+        </div>
+      </Section>
 
       {/* Error */}
       {mutation.isError && (
-        <div className="px-4 mt-3">
-          <div className="bg-dorify-secondary-light text-dorify-secondary text-sm p-3 rounded-xl">
-            {mutation.error instanceof Error
-              ? mutation.error.message
-              : 'Не удалось завершить оформление. Откройте «Мои заказы».'}
+        <div className="px-4 mt-4">
+          <div className="bg-dorify-error-light text-dorify-error rounded-card p-3 flex items-start gap-2">
+            <IconAlert width={18} height={18} className="shrink-0 mt-0.5" />
+            <Text className="text-sm">
+              {mutation.error instanceof Error
+                ? mutation.error.message
+                : 'Не удалось завершить оформление. Откройте «Мои заказы».'}
+            </Text>
           </div>
         </div>
       )}
 
-      {/* Submit */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-tg-secondary shadow-sheet pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      {/* Submit — inline (per Cart lesson PR #20: no fixed bottom bar) */}
+      <div className="px-4 mt-5">
         <Button
           mode="filled"
           size="l"
           stretched
           onClick={() => mutation.mutate()}
-          disabled={!phone || mutation.isPending}
+          disabled={!canSubmit || mutation.isPending}
           className="!bg-dorify-primary"
         >
-          {mutation.isPending ? <Spinner size="s" /> : 'Оформить заказ'}
+          {mutation.isPending ? <Spinner size="s" /> : `Оформить · ${new Intl.NumberFormat('uz-UZ').format(totalPrice)} сум`}
         </Button>
       </div>
     </div>
