@@ -37,7 +37,20 @@ export default function CartPage() {
       {/* Items */}
       <div className="px-4 mt-3 space-y-3">
         {items.map(({ product, quantity }) => (
-          <div key={product.id} className="bg-tg-section rounded-card shadow-card p-3 flex gap-3">
+          <div
+            key={product.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`Перейти к товару ${product.name}`}
+            className="bg-tg-section rounded-card shadow-card p-3 flex gap-3 cursor-pointer transition active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-dorify-primary"
+            onClick={() => navigate(`/product/${product.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate(`/product/${product.id}`);
+              }
+            }}
+          >
             {/* Image */}
             {product.imageUrl ? (
               <img src={product.imageUrl} alt={product.name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
@@ -53,7 +66,10 @@ export default function CartPage() {
               <PriceTag amount={product.price} className="text-sm mt-1 font-semibold" />
 
               <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center gap-2 bg-tg-secondary rounded-lg px-2 py-1">
+                <div
+                  className="flex items-center gap-2 bg-tg-secondary rounded-lg px-2 py-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     className="w-6 h-6 flex items-center justify-center text-tg-hint"
                     onClick={() => updateQuantity(product.id, quantity - 1)}
@@ -72,7 +88,10 @@ export default function CartPage() {
                 </div>
                 <button
                   className="text-dorify-error text-xs"
-                  onClick={() => removeItem(product.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeItem(product.id);
+                  }}
                 >
                   Удалить
                 </button>
