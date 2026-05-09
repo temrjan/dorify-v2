@@ -8,6 +8,40 @@ import { useThemeStore } from '@shared/stores/themeStore';
 type Appearance = 'light' | 'dark';
 type Platform = 'ios' | 'base';
 
+const THEME_VARS = [
+  '--tg-theme-bg-color',
+  '--tg-theme-secondary-bg-color',
+  '--tg-theme-section-bg-color',
+  '--tg-theme-text-color',
+  '--tg-theme-hint-color',
+  '--tg-theme-link-color',
+  '--tg-theme-button-color',
+  '--tg-theme-button-text-color',
+] as const;
+
+const PALETTES: Record<Appearance, Record<(typeof THEME_VARS)[number], string>> = {
+  light: {
+    '--tg-theme-bg-color': '#FFFFFF',
+    '--tg-theme-secondary-bg-color': '#EFEFF4',
+    '--tg-theme-section-bg-color': '#FFFFFF',
+    '--tg-theme-text-color': '#000000',
+    '--tg-theme-hint-color': '#707579',
+    '--tg-theme-link-color': '#007AFF',
+    '--tg-theme-button-color': '#3B82F6',
+    '--tg-theme-button-text-color': '#FFFFFF',
+  },
+  dark: {
+    '--tg-theme-bg-color': '#232E3C',
+    '--tg-theme-secondary-bg-color': '#17212B',
+    '--tg-theme-section-bg-color': '#232E3C',
+    '--tg-theme-text-color': '#FFFFFF',
+    '--tg-theme-hint-color': '#708499',
+    '--tg-theme-link-color': '#6AB3F2',
+    '--tg-theme-button-color': '#3B82F6',
+    '--tg-theme-button-text-color': '#FFFFFF',
+  },
+};
+
 function getTelegramAppearance(): Appearance {
   return window.Telegram?.WebApp?.colorScheme === 'dark' ? 'dark' : 'light';
 }
@@ -35,18 +69,26 @@ export function App() {
   // Resolve effective appearance: 'system' follows Telegram, otherwise explicit override.
   const appearance: Appearance = themeMode === 'system' ? telegramScheme : themeMode;
 
-  // Sync to <html>:
-  // - data-theme = effective appearance (always)
-  // - data-theme-override = mode (only when manual override) — CSS использует чтобы
-  //   подменить --tg-theme-* vars (Telegram даёт vars от своей темы, наш override
-  //   их перебивает только при manual mode).
+  // Sync theme:
+  // - data-theme на <html> = effective appearance (для CSS-only utilities).
+  // - При manual override (mode != 'system') — выставляем --tg-theme-* vars
+  //   ИНЛАЙН на <body> с !important. Telegram WebApp инжектит свои vars
+  //   inline на body с системной темой; чтобы перебить — нужно своё inline
+  //   с !important. CSS правила на html[data-theme-override] не работают
+  //   потому что body's inline более специфичен.
+  // - При 'system' — удаляем наши overrides, Telegram восстанавливает свои.
   useEffect(() => {
     const root = document.documentElement;
+    const body = document.body;
     root.dataset.theme = appearance;
+
     if (themeMode === 'system') {
-      delete root.dataset.themeOverride;
+      THEME_VARS.forEach((varName) => body.style.removeProperty(varName));
     } else {
-      root.dataset.themeOverride = themeMode;
+      const palette = PALETTES[themeMode];
+      THEME_VARS.forEach((varName) => {
+        body.style.setProperty(varName, palette[varName], 'important');
+      });
     }
   }, [appearance, themeMode]);
 

@@ -11,32 +11,10 @@
   --dorify-secondary-light: #FEE2E8;
 }
 
-/* Manual theme override (Profile → toggle).
- * Telegram WebApp setсам --tg-theme-* vars based on user's Telegram theme.
- * При manual override (data-theme-override="light"/"dark") мы перебиваем эти
- * vars нашими fixed values, чтобы body / cards / text / TabBar — все
- * следовали выбору пользователя в нашем app, не в Telegram. */
-html[data-theme-override="light"] {
-  --tg-theme-bg-color: #FFFFFF;
-  --tg-theme-secondary-bg-color: #EFEFF4;
-  --tg-theme-section-bg-color: #FFFFFF;
-  --tg-theme-text-color: #000000;
-  --tg-theme-hint-color: #707579;
-  --tg-theme-link-color: #007AFF;
-  --tg-theme-button-color: #3B82F6;
-  --tg-theme-button-text-color: #FFFFFF;
-}
-
-html[data-theme-override="dark"] {
-  --tg-theme-bg-color: #232E3C;
-  --tg-theme-secondary-bg-color: #17212B;
-  --tg-theme-section-bg-color: #232E3C;
-  --tg-theme-text-color: #FFFFFF;
-  --tg-theme-hint-color: #708499;
-  --tg-theme-link-color: #6AB3F2;
-  --tg-theme-button-color: #3B82F6;
-  --tg-theme-button-text-color: #FFFFFF;
-}
+/* Manual theme override:
+ * Telegram WebApp инжектит --tg-theme-* vars inline на <body>. Чтобы
+ * перебить их при manual override (Profile toggle), App.tsx ставит наши
+ * vars также inline на body с !important. См. App.tsx PALETTES. */
 
 body {
   margin: 0;
