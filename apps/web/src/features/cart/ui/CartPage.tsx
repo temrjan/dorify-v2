@@ -25,7 +25,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="pb-[calc(11rem+env(safe-area-inset-bottom))]">
+    <div>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4">
         <Text className="text-lg font-bold">Корзина ({totalItems})</Text>
@@ -82,26 +82,24 @@ export default function CartPage() {
         ))}
       </div>
 
-      {/* Bottom bar — sits above bottom Tabbar with iOS safe-area awareness */}
-      <div
-        className="fixed left-0 right-0 px-4 py-3 bg-tg-secondary shadow-sheet"
-        style={{
-          bottom: 'calc(4rem + env(safe-area-inset-bottom))',
-        }}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <Text className="text-tg-hint">Итого</Text>
-          <PriceTag amount={totalPrice} className="text-lg font-semibold" />
+      {/* Summary + CTA — inline после items. Скроллится с контентом, не fixed
+       * — упрощает UX (нет collision с TabBar) и убирает magic numbers. */}
+      <div className="px-4 mt-4">
+        <div className="bg-tg-section rounded-card shadow-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <Text className="text-tg-hint">Итого</Text>
+            <PriceTag amount={totalPrice} className="text-lg font-semibold" />
+          </div>
+          <Button
+            mode="filled"
+            size="l"
+            stretched
+            onClick={() => navigate('/checkout')}
+            className="!bg-dorify-primary"
+          >
+            Оформить заказ
+          </Button>
         </div>
-        <Button
-          mode="filled"
-          size="l"
-          stretched
-          onClick={() => navigate('/checkout')}
-          className="!bg-dorify-primary"
-        >
-          Оформить заказ
-        </Button>
       </div>
     </div>
   );
