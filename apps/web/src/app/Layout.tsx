@@ -16,10 +16,14 @@ export function Layout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const cartCount = useCartStore(selectTotalItems);
 
-  const hideTabbar = location.pathname.startsWith('/checkout') || location.pathname.startsWith('/product/');
+  const hideTabbar =
+    location.pathname.startsWith('/checkout') ||
+    location.pathname.startsWith('/product/') ||
+    location.pathname.startsWith('/pharmacy') ||
+    location.pathname.startsWith('/payment');
 
   return (
-    <div className="pb-20">
+    <div className={hideTabbar ? '' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]'}>
       {children}
 
       {!hideTabbar && (
