@@ -6,17 +6,28 @@ import { IamService } from '../../application/iam.service';
 import { AdminLoginSchema } from '../../application/dto/auth.dto';
 import type { AdminLoginDto, TelegramAuthResponse } from '../../application/dto/auth.dto';
 
+interface RequestUser {
+  id: string;
+  telegramId: string;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  role: string;
+  pharmacyId?: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly iamService: IamService) {}
 
   @Get('me')
-  getCurrentUser(@CurrentUser() user: { id: string; role: string; pharmacyId?: string }): TelegramAuthResponse {
+  getCurrentUser(@CurrentUser() user: RequestUser): TelegramAuthResponse {
     return {
       user: {
         id: user.id,
-        telegramId: '',
-        firstName: '',
+        telegramId: user.telegramId,
+        firstName: user.firstName,
+        lastName: user.lastName,
         role: user.role,
         pharmacyId: user.pharmacyId,
       },

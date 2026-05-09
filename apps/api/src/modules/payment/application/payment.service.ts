@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { generateId } from '@shared/domain';
 import { PAYMENT_REPOSITORY } from '../domain/repositories/payment.repository';
 import type { PaymentRepository } from '../domain/repositories/payment.repository';
 import { PAYMENT_GATEWAY } from '../domain/ports/payment-gateway.port';
@@ -53,7 +54,7 @@ export class PaymentService {
 
     // 4. Create payment entity
     const payment = Payment.createPending({
-      id: this.generateCuid(),
+      id: generateId(),
       orderId: order.getId(),
       pharmacyId: order.pharmacyId,
       amount: order.totalAmount,
@@ -173,12 +174,6 @@ export class PaymentService {
       paidAt: payment.paidAt?.toISOString(),
       createdAt: payment.createdAt.toISOString(),
     };
-  }
-
-  private generateCuid(): string {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);
-    return `c${timestamp}${random}`;
   }
 
   private gatewayCredentialsFor(pharmacy: Pharmacy): PaymentGatewayCredentials {
