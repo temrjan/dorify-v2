@@ -8,6 +8,7 @@ import { OrderingModule } from './modules/ordering/ordering.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { SearchModule } from './modules/search/search.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -25,6 +26,7 @@ import { HealthController } from './health.controller';
     PaymentModule,
     NotificationModule,
     SearchModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}
