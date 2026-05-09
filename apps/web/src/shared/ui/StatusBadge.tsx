@@ -1,13 +1,25 @@
-const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  PENDING: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Ожидает' },
-  CONFIRMED: { bg: 'bg-dorify-primary-light', text: 'text-dorify-primary-dark', label: 'Подтверждён' },
-  PREPARING: { bg: 'bg-dorify-primary-light', text: 'text-dorify-primary-dark', label: 'Готовится' },
-  READY: { bg: 'bg-green-100', text: 'text-green-700', label: 'Готов' },
-  DELIVERING: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Доставка' },
-  DELIVERED: { bg: 'bg-green-100', text: 'text-green-700', label: 'Доставлен' },
-  CANCELLED: { bg: 'bg-red-100', text: 'text-red-600', label: 'Отменён' },
-  PAID: { bg: 'bg-green-100', text: 'text-green-700', label: 'Оплачен' },
-  FAILED: { bg: 'bg-red-100', text: 'text-red-600', label: 'Ошибка' },
+import type { ReactNode } from 'react';
+import { Pill, type PillVariant } from './Pill';
+import { IconCheck, IconClock, IconX, IconAlert, IconPackage } from './icons';
+
+interface StatusConfig {
+  label: string;
+  variant: PillVariant;
+  icon?: ReactNode;
+}
+
+const ICON_PROPS = { width: 12, height: 12 } as const;
+
+const STATUS_CONFIG: Record<string, StatusConfig> = {
+  PENDING: { label: 'Ожидает', variant: 'warning', icon: <IconClock {...ICON_PROPS} /> },
+  CONFIRMED: { label: 'Подтверждён', variant: 'primary', icon: <IconCheck {...ICON_PROPS} /> },
+  PREPARING: { label: 'Готовится', variant: 'primary', icon: <IconPackage {...ICON_PROPS} /> },
+  READY: { label: 'Готов', variant: 'success', icon: <IconCheck {...ICON_PROPS} /> },
+  DELIVERING: { label: 'Доставка', variant: 'info', icon: <IconPackage {...ICON_PROPS} /> },
+  DELIVERED: { label: 'Доставлен', variant: 'success', icon: <IconCheck {...ICON_PROPS} /> },
+  CANCELLED: { label: 'Отменён', variant: 'error', icon: <IconX {...ICON_PROPS} /> },
+  PAID: { label: 'Оплачен', variant: 'success', icon: <IconCheck {...ICON_PROPS} /> },
+  FAILED: { label: 'Ошибка', variant: 'error', icon: <IconAlert {...ICON_PROPS} /> },
 };
 
 interface StatusBadgeProps {
@@ -15,10 +27,10 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  const style = STATUS_STYLES[status] ?? { bg: 'bg-gray-100', text: 'text-gray-600', label: status };
+  const cfg = STATUS_CONFIG[status] ?? { label: status, variant: 'neutral' as const };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
-      {style.label}
-    </span>
+    <Pill variant={cfg.variant} icon={cfg.icon}>
+      {cfg.label}
+    </Pill>
   );
 }
