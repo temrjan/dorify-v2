@@ -75,6 +75,11 @@ jobs:
     needs: lint-and-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    # Serialize deploys so close-succession merges don't race on
+    # `docker compose up -d` and orphan containers (Session 3 incident #9).
+    concurrency:
+      group: deploy-main
+      cancel-in-progress: false
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
