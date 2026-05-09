@@ -1,7 +1,7 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-09** (Session 3 — Day 2 design pass complete).
+> Updated: **2026-05-09** (Session 3 — Day 3 design pass closeout).
 
 ---
 
@@ -12,9 +12,10 @@
 **Captain language:** русский, directive-style. Устаёт от ceremony. **Sequential strictly** — не запускать parallel tool calls.
 **Last sessions shipped:**
 - Session 2 (2026-05-08, 6 PR #5–#10): payment frontend flow, pharmacy CRUD, CI/bot/CORS fixes.
-- **Session 3 (2026-05-09, 11 PR #12–#22):** полный design pass v2 — foundation components, HomePage redesign, pharmacy pages polish, profile tab + theme toggle, catalog rename + master categories list.
-**Production live:** v2 frontend визуально готов, buyer flow работает (browse → cart → checkout backend ready). Pharmacy panel functional.
-**Next session:** Phase 4 backend hardening (Multicard) или Tier 2/3 (orders, admin) или продолжение polish (Checkout/PaymentResult/OrdersPage).
+- Session 3 Day 1-2 (2026-05-09, 11 PR #12–#22): полный design pass v2 — foundation components, HomePage redesign, pharmacy pages polish, profile tab + theme toggle, catalog rename + master categories list.
+- **Session 3 Day 3 (2026-05-09, 2 PR #24–#25):** закрытие 3 оставшихся ⏳ из POLISH_PLAN — OrdersPage / ProductPage / Checkout / PaymentResult redesign + StatusBadge → Pill unification. **Дизайн-пасс v2 закрыт полностью.**
+**Production live:** v2 frontend визуально готов **на 100% по POLISH_PLAN**, buyer flow работает (browse → cart → checkout backend ready). Pharmacy panel functional.
+**Next session:** Phase 4 backend hardening (Multicard) или Tier 2/3 (orders, admin) — design backlog пуст.
 
 ---
 
@@ -102,6 +103,8 @@
 | #20 | `fix(web): cart — inline summary+CTA вместо fixed bottom-bar` | +18/-20 LOC |
 | #21 | `feat(web): cart items clickable — navigate to ProductPage on tap` | +22/-3 LOC |
 | #22 | `feat(web): catalog rename + master categories list` (15 categories, single source) | +213/-83 LOC |
+| #24 | `feat(web): design polish — OrdersPage, ProductPage, StatusBadge unify` (PR-1 buyer flow closeout) | +210/-88 LOC |
+| #25 | `feat(web): design polish — CheckoutPage + PaymentResultPage` (PR-2 checkout flow closeout) | +237/-141 LOC |
 
 ### Хроника Session 3
 
@@ -120,6 +123,11 @@
 5. **Cart UX iterations** (PR #20, #21): убрали sticky bottom bar (Captain hint «может скрол должен быть»), сделали inline summary+CTA. Cart items теперь clickable → /product/:id.
 
 6. **Catalog rename + master categories** (PR #22): SearchPage визуально стал Catalog (tab label change, URL stable). 15 категорий в `shared/constants/categories.ts` — единый source для HomePage chips, CatalogPage grid, ProductForm select. Backend permissive.
+
+7. **Day 3 design closeout** (PR #24, #25): закрыли 3 ⏳ из POLISH_PLAN.
+   - PR #24: OrdersPage (count badge, SkeletonCard на loading, EmptyState с IconOrders, theme-aware divider), ProductPage (inline CTA per Cart lesson, IconPackage placeholder, ProductSkeleton, EmptyState на 404, Pill для «По рецепту»), StatusBadge → переписан через `Pill` (единый источник pill-стилей с ProductStatusBadge + иконки для всех статусов).
+   - PR #25: CheckoutPage (section cards «Контакт» / «Способ получения» / «Ваш заказ», radio cards с иконками, **inline submit** с total в label вместо fixed bottom bar), PaymentResultPage (большая иконка в цветном кружке для всех состояний, унифицированный `ResultView` компонент, max-w-sm mx-auto для широких экранов).
+   - **POLISH_PLAN status table — все blocks ✅, страницы 100% покрыты.**
 
 ### Хроника инцидентов / lessons
 
@@ -142,6 +150,8 @@
 7. **Production seed: ts-node в production image есть** (через `node_modules/.bin/ts-node` или `npx ts-node`). pnpm нет — image используется `node` runtime. **Команда:** `docker compose exec -T dorify-backend npx ts-node prisma/seed.ts`.
 
 8. **Tabbar bg от @telegram-apps/telegram-ui не tied к theme vars.** CSS module hashed class содержит `Tabbar_wrapper`. **Override (PR #17):** `[class*="Tabbar_wrapper"] { background: var(--tg-theme-secondary-bg-color) !important; }` в `index.css`.
+
+9. **Concurrent merges → CI deploy race с orphan containers.** Day 3: PR #24 и #25 merged через 16 секунд → два concurrent deploy job'a → второй упал на `Container dorify-bot Error response from daemon: Conflict. The container name "/03531ad5f8d6_dorify-bot" is already in use`. На сервере 3 orphan контейнера в `Created` state, running контейнеры — старые images. **Recovery:** SSH manually → `docker rm -f <orphan-ids>` → `docker compose build && up -d --force-recreate`. Затем `gh run rerun` для clean CI history. **Backlog hardening:** добавить `concurrency: { group: deploy-main, cancel-in-progress: false }` в `.github/workflows/ci.yml` deploy job — сериализует деплои на main, race пропадает. Это **третий incident такого класса** (Session 2 — git pull conflict, Session 3 Day 1 — этот же), permanent fix отложен. Quick fix ~5 LOC.
 
 ### Производственные доступы (что точно сейчас работает)
 
