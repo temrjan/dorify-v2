@@ -40,6 +40,7 @@ enum ProductStatus {
 
 enum OrderStatus {
   PENDING
+  PENDING_MANUAL_CONTACT
   CONFIRMED
   PREPARING
   READY

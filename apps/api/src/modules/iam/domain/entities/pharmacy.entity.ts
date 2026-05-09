@@ -89,6 +89,17 @@ export class Pharmacy extends BaseEntity<PharmacyProps> {
     this.touch();
   }
 
+  reject(reason: string): void {
+    if (this.props.isVerified) {
+      throw new DomainError('Cannot reject already verified pharmacy');
+    }
+    if (reason.trim().length === 0) {
+      throw new DomainError('Reject reason is required');
+    }
+    this.props.isActive = false;
+    this.touch();
+  }
+
   activate(): void {
     if (!this.props.isVerified) {
       throw new DomainError('Cannot activate unverified pharmacy');

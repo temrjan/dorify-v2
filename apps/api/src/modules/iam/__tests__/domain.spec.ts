@@ -147,6 +147,25 @@ describe('Pharmacy', () => {
     expect(() => pharmacy.activate()).toThrow('Cannot activate unverified');
   });
 
+  it('should reject with reason and deactivate', () => {
+    const pharmacy = createPharmacy();
+    pharmacy.reject('License invalid');
+    expect(pharmacy.isVerified).toBe(false);
+    expect(pharmacy.isActive).toBe(false);
+  });
+
+  it('should not reject already verified', () => {
+    const pharmacy = createPharmacy();
+    pharmacy.verify();
+    expect(() => pharmacy.reject('any')).toThrow('Cannot reject already verified');
+  });
+
+  it('should not reject with empty reason', () => {
+    const pharmacy = createPharmacy();
+    expect(() => pharmacy.reject('')).toThrow('Reject reason is required');
+    expect(() => pharmacy.reject('   ')).toThrow('Reject reason is required');
+  });
+
   it('should reject short name', () => {
     expect(() =>
       Pharmacy.create({

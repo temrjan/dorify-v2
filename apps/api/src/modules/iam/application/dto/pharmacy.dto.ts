@@ -52,3 +52,20 @@ export interface PaymentSettingsResponse {
   multicardStoreId?: string;
   multicardSecret?: string; // Masked: ****xxxx
 }
+
+export const CheckSlugSchema = z.object({
+  slug: z.string().min(2).max(100).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with dashes'),
+});
+
+export type CheckSlugDto = z.infer<typeof CheckSlugSchema>;
+
+export interface SlugAvailabilityResponse {
+  available: boolean;
+  suggestion?: string;
+}
+
+export const RejectPharmacySchema = z.object({
+  reason: z.string().min(1).max(500),
+});
+
+export type RejectPharmacyDto = z.infer<typeof RejectPharmacySchema>;
