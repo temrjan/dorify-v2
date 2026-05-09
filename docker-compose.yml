@@ -8,6 +8,8 @@ services:
     env_file: ./.env
     security_opt: [no-new-privileges:true]
     mem_limit: 256m
+    volumes:
+      - dorify_uploads:/opt/dorify-v2/uploads
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/api/v1/health']
       interval: 30s
@@ -45,6 +47,9 @@ services:
       timeout: 5s
       retries: 3
     networks: [internal]
+
+volumes:
+  dorify_uploads:
 
 networks:
   proxy:

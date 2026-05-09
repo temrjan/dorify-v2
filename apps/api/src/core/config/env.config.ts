@@ -36,6 +36,11 @@ const EnvSchema = z.object({
   ADMIN_PASSWORD_HASH: z
     .string()
     .regex(/^\$2[ayb]\$\d{2}\$.{53}$/, 'ADMIN_PASSWORD_HASH must be a bcrypt hash'),
+  // Storage paths for image uploads. Default — local volume mounted in
+  // docker-compose.yml; swap to S3-compatible adapter позже.
+  STORAGE_PATH: z.string().default('/opt/dorify-v2/uploads'),
+  STORAGE_BASE_URL: z.string().url().default('https://api.dorify.uz/uploads'),
+  STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
