@@ -6,7 +6,7 @@ import { useCartStore, selectTotalItems } from '@shared/stores/cartStore';
 
 const TABS = [
   { id: '/', label: 'Главная', Icon: IconHome },
-  { id: '/search', label: 'Поиск', Icon: IconSearch },
+  { id: '/search', label: 'Каталог', Icon: IconSearch },
   { id: '/cart', label: 'Корзина', Icon: IconCart },
   { id: '/profile', label: 'Профиль', Icon: IconUser },
 ];
