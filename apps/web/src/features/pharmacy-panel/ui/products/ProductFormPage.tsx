@@ -8,6 +8,7 @@ import type {
   UpdateProductPayload,
 } from '@shared/api/pharmacyProducts';
 import type { Product } from '@shared/types';
+import { IconAlert } from '@shared/ui/icons';
 import { ProductStatusBadge } from './components/ProductStatusBadge';
 
 interface FormState {
@@ -147,6 +148,57 @@ function buildPayload(form: FormState): CreateProductPayload {
   };
 }
 
+interface SectionProps {
+  title?: string;
+  description?: string;
+  children: React.ReactNode;
+  className?: string;
+}
+
+function Section({ title, description, children, className = '' }: SectionProps) {
+  return (
+    <section
+      className={`bg-tg-section rounded-card shadow-card p-4 mt-3 space-y-3 ${className}`}
+    >
+      {title && (
+        <div className="-mb-1">
+          <Text className="text-sm font-semibold block">{title}</Text>
+          {description && (
+            <Text className="text-xs text-tg-hint mt-0.5 block">{description}</Text>
+          )}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+interface FieldProps {
+  label: string;
+  required?: boolean;
+  error?: string;
+  hint?: string;
+  children: React.ReactNode;
+}
+
+function Field({ label, required, error, hint, children }: FieldProps) {
+  return (
+    <div>
+      <label className="text-xs text-tg-hint block mb-1">
+        {label}
+        {required && <span className="text-dorify-error ml-0.5">*</span>}
+      </label>
+      {children}
+      {error && (
+        <Text className="text-xs text-dorify-error mt-1 block">{error}</Text>
+      )}
+      {hint && !error && (
+        <Text className="text-xs text-tg-hint mt-1 block">{hint}</Text>
+      )}
+    </div>
+  );
+}
+
 interface ProductFormProps {
   productId?: string;
   initialProduct?: Product;
@@ -231,51 +283,52 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
     [productId],
   );
 
+  const errorCount = Object.keys(errors).length;
+
   return (
-    <div className="pb-28">
+    <div className="pb-28 px-4 pt-4">
       {/* Header */}
-      <div className="px-4 pt-4 flex items-start justify-between gap-2">
-        <div>
-          <Text className="text-lg font-bold block">
-            {isEdit ? 'Редактирование товара' : 'Новый товар'}
-          </Text>
-          {initialProduct && (
-            <div className="mt-1">
-              <ProductStatusBadge
-                status={initialProduct.status}
-                moderationNote={initialProduct.moderationNote}
-              />
-              {initialProduct.status === 'REJECTED' && initialProduct.moderationNote && (
-                <Text className="text-xs text-dorify-secondary mt-1 block">
-                  Причина: {initialProduct.moderationNote}
-                </Text>
-              )}
-            </div>
-          )}
-        </div>
+      <div>
+        <Text className="text-lg font-bold block">
+          {isEdit ? 'Редактирование товара' : 'Новый товар'}
+        </Text>
+        {initialProduct && (
+          <div className="mt-2 flex flex-col gap-1">
+            <ProductStatusBadge
+              status={initialProduct.status}
+              moderationNote={initialProduct.moderationNote}
+            />
+            {initialProduct.status === 'REJECTED' && initialProduct.moderationNote && (
+              <Text className="text-xs text-dorify-error block mt-1">
+                {initialProduct.moderationNote}
+              </Text>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Required */}
-      <div className="px-4 mt-5 space-y-3">
-        <div>
-          <label className="text-sm font-medium text-tg-hint block mb-1">
-            Название *
-          </label>
+      {/* Errors summary */}
+      {errorCount > 1 && (
+        <div className="mt-3 bg-dorify-error-light text-dorify-error rounded-card p-3 flex items-start gap-2">
+          <IconAlert width={18} height={18} className="shrink-0 mt-0.5" />
+          <Text className="text-sm">
+            Найдено {errorCount} {errorCount < 5 ? 'ошибки' : 'ошибок'}. Проверьте поля ниже.
+          </Text>
+        </div>
+      )}
+
+      {/* Section: Основное */}
+      <Section title="Основное">
+        <Field label="Название" required error={errors.name}>
           <Input
             placeholder="Парацетамол 500мг"
             value={form.name}
             onChange={(e) => updateField('name', e.target.value)}
             status={errors.name ? 'error' : undefined}
           />
-          {errors.name && (
-            <Text className="text-xs text-dorify-secondary mt-1 block">{errors.name}</Text>
-          )}
-        </div>
+        </Field>
 
-        <div>
-          <label className="text-sm font-medium text-tg-hint block mb-1">
-            Цена (UZS) *
-          </label>
+        <Field label="Цена (UZS)" required error={errors.price}>
           <Input
             type="number"
             inputMode="numeric"
@@ -284,31 +337,21 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
             onChange={(e) => updateField('price', e.target.value)}
             status={errors.price ? 'error' : undefined}
           />
-          {errors.price && (
-            <Text className="text-xs text-dorify-secondary mt-1 block">{errors.price}</Text>
-          )}
-        </div>
+        </Field>
 
-        <div>
-          <label className="text-sm font-medium text-tg-hint block mb-1">Описание</label>
+        <Field label="Описание" error={errors.description}>
           <Textarea
             placeholder="Показания, противопоказания..."
             value={form.description}
             onChange={(e) => updateField('description', e.target.value)}
             rows={3}
           />
-          {errors.description && (
-            <Text className="text-xs text-dorify-secondary mt-1 block">
-              {errors.description}
-            </Text>
-          )}
-        </div>
+        </Field>
 
-        <div>
-          <label className="text-sm font-medium text-tg-hint block mb-1">Категория</label>
+        <Field label="Категория" error={errors.category}>
           <input
             list={categoriesDatalistId}
-            className="w-full bg-tg-section text-tg rounded-xl px-4 py-3 text-sm"
+            className="w-full bg-tg-bg text-tg rounded-xl px-4 py-3 text-sm border border-transparent focus:border-dorify-primary focus:outline-none"
             placeholder="Антибиотики"
             value={form.category}
             onChange={(e) => updateField('category', e.target.value)}
@@ -318,61 +361,39 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
               <option key={cat} value={cat} />
             ))}
           </datalist>
-          {errors.category && (
-            <Text className="text-xs text-dorify-secondary mt-1 block">{errors.category}</Text>
-          )}
-        </div>
-      </div>
+        </Field>
+      </Section>
 
-      {/* Optional details */}
-      <div className="px-4 mt-5 space-y-3">
-        <Text className="text-sm font-medium text-tg-hint block">Дополнительно</Text>
-
-        <div>
-          <label className="text-xs text-tg-hint block mb-1">Действующее вещество</label>
+      {/* Section: Характеристики */}
+      <Section title="Характеристики">
+        <Field label="Действующее вещество" error={errors.activeSubstance}>
           <Input
             placeholder="Парацетамол"
             value={form.activeSubstance}
             onChange={(e) => updateField('activeSubstance', e.target.value)}
             status={errors.activeSubstance ? 'error' : undefined}
           />
-          {errors.activeSubstance && (
-            <Text className="text-xs text-dorify-secondary mt-1 block">
-              {errors.activeSubstance}
-            </Text>
-          )}
-        </div>
+        </Field>
 
-        <div>
-          <label className="text-xs text-tg-hint block mb-1">Производитель</label>
+        <Field label="Производитель" error={errors.manufacturer}>
           <Input
             placeholder="Фармстандарт"
             value={form.manufacturer}
             onChange={(e) => updateField('manufacturer', e.target.value)}
             status={errors.manufacturer ? 'error' : undefined}
           />
-          {errors.manufacturer && (
-            <Text className="text-xs text-dorify-secondary mt-1 block">
-              {errors.manufacturer}
-            </Text>
-          )}
-        </div>
+        </Field>
 
         <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-xs text-tg-hint block mb-1">Штрих-код</label>
+          <Field label="Штрих-код" error={errors.barcode}>
             <Input
               placeholder="4607000123456"
               value={form.barcode}
               onChange={(e) => updateField('barcode', e.target.value)}
               status={errors.barcode ? 'error' : undefined}
             />
-            {errors.barcode && (
-              <Text className="text-xs text-dorify-secondary mt-1 block">{errors.barcode}</Text>
-            )}
-          </div>
-          <div>
-            <label className="text-xs text-tg-hint block mb-1">Остаток</label>
+          </Field>
+          <Field label="Остаток" error={errors.stock}>
             <Input
               type="number"
               inputMode="numeric"
@@ -381,101 +402,83 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
               onChange={(e) => updateField('stock', e.target.value)}
               status={errors.stock ? 'error' : undefined}
             />
-            {errors.stock && (
-              <Text className="text-xs text-dorify-secondary mt-1 block">{errors.stock}</Text>
-            )}
-          </div>
+          </Field>
         </div>
 
-        <div>
-          <label className="text-xs text-tg-hint block mb-1">URL изображения</label>
+        <label className="flex items-center justify-between py-2 cursor-pointer">
+          <span className="text-sm">Только по рецепту</span>
+          <input
+            type="checkbox"
+            checked={form.requiresPrescription}
+            onChange={(e) => updateField('requiresPrescription', e.target.checked)}
+            className="w-5 h-5 accent-dorify-primary"
+          />
+        </label>
+      </Section>
+
+      {/* Section: Изображение */}
+      <Section title="Изображение">
+        <Field label="URL изображения" error={errors.imageUrl}>
           <Input
             placeholder="https://..."
             value={form.imageUrl}
             onChange={(e) => updateField('imageUrl', e.target.value)}
             status={errors.imageUrl ? 'error' : undefined}
           />
-          {errors.imageUrl && (
-            <Text className="text-xs text-dorify-secondary mt-1 block">{errors.imageUrl}</Text>
-          )}
-          {form.imageUrl && !errors.imageUrl && /^https?:\/\//i.test(form.imageUrl) && (
-            <img
-              src={form.imageUrl}
-              alt="превью"
-              className="mt-2 w-24 h-24 object-cover rounded-lg bg-tg-secondary"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-          )}
-        </div>
-
-        <label className="flex items-center justify-between py-2">
-          <span className="text-sm">Только по рецепту</span>
-          <input
-            type="checkbox"
-            checked={form.requiresPrescription}
-            onChange={(e) => updateField('requiresPrescription', e.target.checked)}
-            className="w-5 h-5"
+        </Field>
+        {form.imageUrl && !errors.imageUrl && /^https?:\/\//i.test(form.imageUrl) && (
+          <img
+            src={form.imageUrl}
+            alt="превью"
+            className="w-32 h-32 object-cover rounded-lg bg-tg-secondary"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
           />
-        </label>
-      </div>
+        )}
+      </Section>
 
-      {/* OFD section */}
-      <div className="px-4 mt-5">
+      {/* Section: OFD (collapsible) */}
+      <Section className="!p-0">
         <button
           type="button"
           onClick={() => setShowOfd((s) => !s)}
-          className="w-full flex items-center justify-between py-2 text-sm font-medium text-tg-hint"
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
         >
-          <span>OFD (для оплаты через Multicard)</span>
-          <span className="text-xs">{showOfd ? '▲' : '▼'}</span>
+          <div>
+            <span>OFD-данные</span>
+            <Text className="text-xs text-tg-hint block mt-0.5 font-normal">
+              для оплаты через Multicard
+            </Text>
+          </div>
+          <span className="text-tg-hint text-xs">{showOfd ? '▲' : '▼'}</span>
         </button>
 
         {showOfd && (
-          <div className="space-y-3 pt-2">
-            <Text className="text-xs text-tg-hint block">
-              Необязательно. Заполните если аптека принимает оплату через Multicard —
-              иначе фискальный чек не сформируется.
-            </Text>
-
-            <div>
-              <label className="text-xs text-tg-hint block mb-1">ИКПУ (mxik)</label>
+          <div className="px-4 pb-4 space-y-3 border-t border-tg-secondary pt-3">
+            <Field label="ИКПУ (mxik)" error={errors.ikpu} hint="17 цифр. Источник: tasnif.soliq.uz">
               <Input
                 placeholder="00000000000000000"
                 value={form.ikpu}
                 onChange={(e) => updateField('ikpu', e.target.value)}
                 status={errors.ikpu ? 'error' : undefined}
               />
-              {errors.ikpu && (
-                <Text className="text-xs text-dorify-secondary mt-1 block">{errors.ikpu}</Text>
-              )}
-              <Text className="text-xs text-tg-hint mt-1 block">
-                17 цифр. Источник: tasnif.soliq.uz
-              </Text>
-            </div>
+            </Field>
 
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs text-tg-hint block mb-1">Код упаковки</label>
+              <Field label="Код упаковки" error={errors.packageCode}>
                 <Input
                   placeholder="0000000"
                   value={form.packageCode}
                   onChange={(e) => updateField('packageCode', e.target.value)}
                   status={errors.packageCode ? 'error' : undefined}
                 />
-                {errors.packageCode && (
-                  <Text className="text-xs text-dorify-secondary mt-1 block">
-                    {errors.packageCode}
-                  </Text>
-                )}
-              </div>
-              <div>
-                <label className="text-xs text-tg-hint block mb-1">НДС</label>
+              </Field>
+              <Field label="НДС">
                 <select
                   value={form.vat}
                   onChange={(e) => updateField('vat', e.target.value)}
-                  className="w-full bg-tg-section text-tg rounded-xl px-4 py-3 text-sm"
+                  className="w-full bg-tg-bg text-tg rounded-xl px-4 py-3 text-sm border border-transparent focus:border-dorify-primary focus:outline-none"
                 >
                   {VAT_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -483,25 +486,26 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
             </div>
           </div>
         )}
-      </div>
+      </Section>
 
       {/* Mutation error */}
       {mutationError && (
-        <div className="px-4 mt-4">
-          <div className="bg-dorify-secondary-light text-dorify-secondary text-sm p-3 rounded-xl">
+        <div className="mt-3 bg-dorify-error-light text-dorify-error rounded-card p-3 flex items-start gap-2">
+          <IconAlert width={18} height={18} className="shrink-0 mt-0.5" />
+          <Text className="text-sm">
             {mutationError instanceof Error
               ? mutationError.message
               : 'Не удалось сохранить товар. Попробуйте ещё раз.'}
-          </div>
+          </Text>
         </div>
       )}
 
       {/* Submit */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-tg-bg border-t border-gray-100">
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-tg-bg shadow-sheet pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <Button
           mode="filled"
           size="l"
