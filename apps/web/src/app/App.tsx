@@ -35,11 +35,20 @@ export function App() {
   // Resolve effective appearance: 'system' follows Telegram, otherwise explicit override.
   const appearance: Appearance = themeMode === 'system' ? telegramScheme : themeMode;
 
-  // Sync to <html> so CSS-only adjustments (like tabbar override) can target it.
+  // Sync to <html>:
+  // - data-theme = effective appearance (always)
+  // - data-theme-override = mode (only when manual override) — CSS использует чтобы
+  //   подменить --tg-theme-* vars (Telegram даёт vars от своей темы, наш override
+  //   их перебивает только при manual mode).
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = appearance;
-  }, [appearance]);
+    if (themeMode === 'system') {
+      delete root.dataset.themeOverride;
+    } else {
+      root.dataset.themeOverride = themeMode;
+    }
+  }, [appearance, themeMode]);
 
   return (
     <AppRoot appearance={appearance} platform={platform}>
