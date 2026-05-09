@@ -1,11 +1,28 @@
 # Design Pass — UI Polish Plan
 
-> Создан 2026-05-08 в финале Session 2. Захуплено по запросу Captain:
-> «можно фронтент, дизайн нормальный сделать ... начнем с дизайна».
->
-> Цель — превратить **functional MVP UI** в **production-ready UX**:
-> читаемая иерархия, hover/active states, skeletons, empty states,
-> consistent spacing, иконки в bottom nav, tone-adjusted color usage.
+> Создан 2026-05-08 в финале Session 2.
+> **Session 3 (2026-05-09): большая часть scope выполнена** — см. ✅ маркеры
+> ниже. PR #12-#22 закрыли foundation, HomePage, BottomNav, pharmacy pages,
+> theme system, profile, cart, catalog. Что осталось — отмечено ⏳.
+
+## Status (Session 3 close)
+
+| Block | Status |
+|---|---|
+| Component library (Skeleton/EmptyState/Pill + extended icons) | ✅ PR #12 |
+| HomePage redesign | ✅ PR #13 |
+| BottomNav polish | ✅ PR #13, #17 |
+| Pharmacy pages (PharmacyHomePage, ProductsListPage, ProductFormPage, ProductCard, ProductStatusBadge) | ✅ PR #15 |
+| Theme adaptive + override (toggle, persist) | ✅ PR #16, #17, #19 |
+| Profile tab | ✅ PR #17 |
+| Cart redesign + clickable items | ✅ PR #20, #21 |
+| Catalog rename + master categories | ✅ PR #22 |
+| TabBar bg unification | ✅ PR #17, #19 |
+| iOS safe-area handling | ✅ PR #16, #17 |
+| Seed для visual smoke | ✅ PR #14 |
+| OrdersPage redesign | ⏳ pending (старый стиль) |
+| ProductPage review | ⏳ pending (старый стиль) |
+| Checkout / PaymentResult minor polish | ⏳ pending (sticky bars work, visuals OK) |
 
 ---
 
