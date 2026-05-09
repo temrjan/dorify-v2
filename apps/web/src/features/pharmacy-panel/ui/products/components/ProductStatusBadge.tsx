@@ -1,50 +1,61 @@
 import type { ProductStatus } from '@shared/types';
+import { Pill, type PillVariant } from '@shared/ui/Pill';
+import { IconCheck, IconClock, IconX, IconAlert } from '@shared/ui/icons';
+import type { ReactNode } from 'react';
 
 interface ProductStatusBadgeProps {
   status: ProductStatus;
   moderationNote?: string;
 }
 
-interface BadgeConfig {
+interface StatusConfig {
   label: string;
-  className: string;
+  variant: PillVariant;
+  icon?: ReactNode;
 }
 
-const STATUS_CONFIG: Record<ProductStatus, BadgeConfig> = {
+const ICON_PROPS = { width: 12, height: 12 } as const;
+
+const STATUS_CONFIG: Record<ProductStatus, StatusConfig> = {
   DRAFT: {
     label: 'Черновик',
-    className: 'bg-gray-200 text-gray-700',
+    variant: 'neutral',
   },
   PENDING_MODERATION: {
     label: 'На модерации',
-    className: 'bg-amber-100 text-amber-800',
+    variant: 'warning',
+    icon: <IconClock {...ICON_PROPS} />,
   },
   PUBLISHED: {
     label: 'Опубликован',
-    className: 'bg-green-100 text-green-800',
+    variant: 'success',
+    icon: <IconCheck {...ICON_PROPS} />,
   },
   REJECTED: {
     label: 'Отклонён',
-    className: 'bg-red-100 text-red-800',
+    variant: 'error',
+    icon: <IconAlert {...ICON_PROPS} />,
   },
   HIDDEN: {
     label: 'Скрыт',
-    className: 'bg-gray-100 text-gray-600',
+    variant: 'neutral',
+    icon: <IconX {...ICON_PROPS} />,
   },
   EXPIRED: {
     label: 'Истёк',
-    className: 'bg-gray-100 text-gray-500',
+    variant: 'neutral',
   },
 };
 
 export function ProductStatusBadge({ status, moderationNote }: ProductStatusBadgeProps) {
   const cfg = STATUS_CONFIG[status];
   return (
-    <span
-      className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${cfg.className}`}
+    <Pill
+      variant={cfg.variant}
+      icon={cfg.icon}
       title={status === 'REJECTED' && moderationNote ? moderationNote : undefined}
     >
       {cfg.label}
-    </span>
+    </Pill>
   );
 }

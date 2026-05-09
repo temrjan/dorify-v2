@@ -1,5 +1,6 @@
 import { Text } from '@telegram-apps/telegram-ui';
 import { PriceTag } from '@shared/ui/PriceTag';
+import { IconPackage, IconX } from '@shared/ui/icons';
 import { ProductStatusBadge } from './ProductStatusBadge';
 import type { Product } from '@shared/types';
 
@@ -18,7 +19,7 @@ export function ProductCard({ product, onEdit, onDelete }: ProductCardProps) {
       role="button"
       tabIndex={0}
       aria-label={`Редактировать ${product.name}`}
-      className="bg-tg-section rounded-xl p-3 flex gap-3 cursor-pointer active:opacity-70 focus:outline-none focus:ring-2 focus:ring-dorify-primary"
+      className="bg-tg-section rounded-card shadow-card p-3 flex gap-3 cursor-pointer transition active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-dorify-primary"
       onClick={() => onEdit(product)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -37,7 +38,7 @@ export function ProductCard({ product, onEdit, onDelete }: ProductCardProps) {
             loading="lazy"
           />
         ) : (
-          <Text className="text-tg-hint text-xs">нет фото</Text>
+          <IconPackage width={24} height={24} className="text-tg-hint" />
         )}
       </div>
 
@@ -55,14 +56,14 @@ export function ProductCard({ product, onEdit, onDelete }: ProductCardProps) {
         )}
 
         <div className="flex items-center justify-between mt-1.5">
-          <PriceTag amount={product.price} />
-          <div className="flex items-center gap-2 text-xs">
+          <PriceTag amount={product.price} className="font-semibold" />
+          <div className="flex items-center gap-1 text-xs">
             <Text
               className={
                 outOfStock
-                  ? 'text-dorify-secondary'
+                  ? 'text-dorify-error'
                   : lowStock
-                    ? 'text-amber-600'
+                    ? 'text-dorify-warning'
                     : 'text-tg-hint'
               }
             >
@@ -74,10 +75,10 @@ export function ProductCard({ product, onEdit, onDelete }: ProductCardProps) {
                 e.stopPropagation();
                 onDelete(product);
               }}
-              className="text-tg-hint hover:text-dorify-secondary px-2 py-0.5 -my-0.5 rounded"
+              className="text-tg-hint hover:text-dorify-error p-1 -my-1 rounded"
               aria-label="Удалить товар"
             >
-              ×
+              <IconX width={16} height={16} />
             </button>
           </div>
         </div>
