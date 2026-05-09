@@ -3,11 +3,12 @@ import { AppRoot } from '@telegram-apps/telegram-ui';
 import { Providers } from './providers';
 import { AppRouter } from './router';
 import { Layout } from './Layout';
+import { useThemeStore } from '@shared/stores/themeStore';
 
 type Appearance = 'light' | 'dark';
 type Platform = 'ios' | 'base';
 
-function getAppearance(): Appearance {
+function getTelegramAppearance(): Appearance {
   return window.Telegram?.WebApp?.colorScheme === 'dark' ? 'dark' : 'light';
 }
 
@@ -16,19 +17,29 @@ function getPlatform(): Platform {
 }
 
 export function App() {
-  const [appearance, setAppearance] = useState<Appearance>(getAppearance);
+  const themeMode = useThemeStore((s) => s.mode);
+  const [telegramScheme, setTelegramScheme] = useState<Appearance>(getTelegramAppearance);
   const [platform] = useState<Platform>(getPlatform);
 
-  // React to Telegram theme changes (user toggles dark/light in Telegram settings)
+  // Track Telegram colorScheme so 'system' mode reacts to system changes.
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg?.onEvent) return;
-    const handler = () => setAppearance(getAppearance());
+    const handler = () => setTelegramScheme(getTelegramAppearance());
     tg.onEvent('themeChanged', handler);
     return () => {
       tg.offEvent?.('themeChanged', handler);
     };
   }, []);
+
+  // Resolve effective appearance: 'system' follows Telegram, otherwise explicit override.
+  const appearance: Appearance = themeMode === 'system' ? telegramScheme : themeMode;
+
+  // Sync to <html> so CSS-only adjustments (like tabbar override) can target it.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = appearance;
+  }, [appearance]);
 
   return (
     <AppRoot appearance={appearance} platform={platform}>

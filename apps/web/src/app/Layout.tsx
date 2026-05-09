@@ -1,14 +1,14 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FixedLayout, Tabbar } from '@telegram-apps/telegram-ui';
 import type { ReactNode } from 'react';
-import { IconHome, IconSearch, IconCart, IconOrders } from '@shared/ui/icons';
+import { IconHome, IconSearch, IconCart, IconUser } from '@shared/ui/icons';
 import { useCartStore, selectTotalItems } from '@shared/stores/cartStore';
 
 const TABS = [
   { id: '/', label: 'Главная', Icon: IconHome },
   { id: '/search', label: 'Поиск', Icon: IconSearch },
   { id: '/cart', label: 'Корзина', Icon: IconCart },
-  { id: '/orders', label: 'Заказы', Icon: IconOrders },
+  { id: '/profile', label: 'Профиль', Icon: IconUser },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {

@@ -84,7 +84,7 @@ export default function CartPage() {
 
       {/* Bottom bar — sits above bottom Tabbar with iOS safe-area awareness */}
       <div
-        className="fixed left-0 right-0 px-4 py-3 bg-tg-bg shadow-sheet"
+        className="fixed left-0 right-0 px-4 py-3 bg-tg-secondary shadow-sheet"
         style={{
           bottom: 'calc(4rem + env(safe-area-inset-bottom))',
         }}
