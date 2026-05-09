@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Spinner, Text, Textarea } from '@telegram-apps/telegram-ui';
@@ -9,6 +9,7 @@ import type {
 } from '@shared/api/pharmacyProducts';
 import type { Product } from '@shared/types';
 import { IconAlert } from '@shared/ui/icons';
+import { CATEGORIES } from '@shared/constants/categories';
 import { ProductStatusBadge } from './components/ProductStatusBadge';
 
 interface FormState {
@@ -47,17 +48,6 @@ const VAT_OPTIONS = [
   { value: '0', label: 'Без НДС (0%)' },
   { value: '12', label: '12%' },
   { value: '15', label: '15%' },
-];
-
-const COMMON_CATEGORIES = [
-  'Антибиотики',
-  'Витамины',
-  'Безрецептурные',
-  'Жаропонижающие',
-  'Обезболивающие',
-  'Противовирусные',
-  'Желудочно-кишечные',
-  'Сердечно-сосудистые',
 ];
 
 type FormErrors = Partial<Record<keyof FormState, string>>;
@@ -278,11 +268,6 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
     }
   };
 
-  const categoriesDatalistId = useMemo(
-    () => `cat-${productId ?? 'new'}`,
-    [productId],
-  );
-
   const errorCount = Object.keys(errors).length;
 
   return (
@@ -349,18 +334,18 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
         </Field>
 
         <Field label="Категория" error={errors.category}>
-          <input
-            list={categoriesDatalistId}
-            className="w-full bg-tg-bg text-tg rounded-xl px-4 py-3 text-sm border border-transparent focus:border-dorify-primary focus:outline-none"
-            placeholder="Антибиотики"
+          <select
             value={form.category}
             onChange={(e) => updateField('category', e.target.value)}
-          />
-          <datalist id={categoriesDatalistId}>
-            {COMMON_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat} />
+            className="w-full bg-tg-bg text-tg rounded-xl px-4 py-3 text-sm border border-transparent focus:border-dorify-primary focus:outline-none"
+          >
+            <option value="">— Выберите категорию —</option>
+            {CATEGORIES.map((cat) => (
+              <option key={cat.slug} value={cat.slug}>
+                {cat.emoji} {cat.slug}
+              </option>
             ))}
-          </datalist>
+          </select>
         </Field>
       </Section>
 

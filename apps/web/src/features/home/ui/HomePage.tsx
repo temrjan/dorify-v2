@@ -7,21 +7,21 @@ import { PriceTag } from '@shared/ui/PriceTag';
 import { SkeletonCard } from '@shared/ui/Skeleton';
 import { EmptyState } from '@shared/ui/EmptyState';
 import { IconSearch, IconPackage } from '@shared/ui/icons';
+import { CATEGORIES, ALL_CATEGORIES_OPTION } from '@shared/constants/categories';
 import type { Product } from '@shared/types';
 
-const CATEGORIES = ['Все', 'Лекарства', 'Витамины', 'Косметика', 'БАД', 'Гигиена'];
 const SKELETON_COUNT = 6;
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [category, setCategory] = useState('Все');
+  const [category, setCategory] = useState<string>(ALL_CATEGORIES_OPTION);
   const [search, setSearch] = useState('');
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['products', category, search],
     queryFn: () =>
       productsApi.list({
-        category: category === 'Все' ? undefined : category,
+        category: category === ALL_CATEGORIES_OPTION ? undefined : category,
         search: search || undefined,
         limit: 20,
       }),
@@ -70,13 +70,20 @@ export default function HomePage() {
 
       {/* Category chips */}
       <div className="flex gap-2 px-4 pt-2 overflow-x-auto no-scrollbar">
+        <Chip
+          key={ALL_CATEGORIES_OPTION}
+          mode={category === ALL_CATEGORIES_OPTION ? 'elevated' : 'mono'}
+          onClick={() => setCategory(ALL_CATEGORIES_OPTION)}
+        >
+          {ALL_CATEGORIES_OPTION}
+        </Chip>
         {CATEGORIES.map((cat) => (
           <Chip
-            key={cat}
-            mode={category === cat ? 'elevated' : 'mono'}
-            onClick={() => setCategory(cat)}
+            key={cat.slug}
+            mode={category === cat.slug ? 'elevated' : 'mono'}
+            onClick={() => setCategory(cat.slug)}
           >
-            {cat}
+            {cat.emoji} {cat.slug}
           </Chip>
         ))}
       </div>
@@ -113,17 +120,17 @@ export default function HomePage() {
             icon={<IconPackage width={48} height={48} />}
             title="Товары не найдены"
             description={
-              search || category !== 'Все'
+              search || category !== ALL_CATEGORIES_OPTION
                 ? 'По вашему запросу ничего не нашли. Попробуйте изменить фильтры.'
                 : 'Каталог пока пуст. Скоро появятся первые товары.'
             }
             action={
-              search || category !== 'Все' ? (
+              search || category !== ALL_CATEGORIES_OPTION ? (
                 <button
                   type="button"
                   onClick={() => {
                     setSearch('');
-                    setCategory('Все');
+                    setCategory(ALL_CATEGORIES_OPTION);
                   }}
                   className="px-5 py-2.5 rounded-full bg-dorify-primary text-white text-sm font-medium active:opacity-80"
                 >
