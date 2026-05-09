@@ -25,11 +25,11 @@ export default function CartPage() {
   }
 
   return (
-    <div className="pb-28">
+    <div className="pb-[calc(11rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4">
         <Text className="text-lg font-bold">Корзина ({totalItems})</Text>
-        <button className="text-dorify-secondary text-sm font-medium" onClick={clearCart}>
+        <button className="text-dorify-error text-sm font-medium" onClick={clearCart}>
           Очистить
         </button>
       </div>
@@ -37,7 +37,7 @@ export default function CartPage() {
       {/* Items */}
       <div className="px-4 mt-3 space-y-3">
         {items.map(({ product, quantity }) => (
-          <div key={product.id} className="bg-tg-section rounded-xl p-3 flex gap-3">
+          <div key={product.id} className="bg-tg-section rounded-card shadow-card p-3 flex gap-3">
             {/* Image */}
             {product.imageUrl ? (
               <img src={product.imageUrl} alt={product.name} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
@@ -50,13 +50,14 @@ export default function CartPage() {
             {/* Details */}
             <div className="flex-1 min-w-0">
               <Text className="text-sm font-medium line-clamp-2">{product.name}</Text>
-              <PriceTag amount={product.price} className="text-sm mt-1" />
+              <PriceTag amount={product.price} className="text-sm mt-1 font-semibold" />
 
               <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-2 bg-tg-secondary rounded-lg px-2 py-1">
                   <button
                     className="w-6 h-6 flex items-center justify-center text-tg-hint"
                     onClick={() => updateQuantity(product.id, quantity - 1)}
+                    aria-label="Уменьшить"
                   >
                     −
                   </button>
@@ -64,12 +65,13 @@ export default function CartPage() {
                   <button
                     className="w-6 h-6 flex items-center justify-center text-dorify-primary"
                     onClick={() => updateQuantity(product.id, quantity + 1)}
+                    aria-label="Увеличить"
                   >
                     +
                   </button>
                 </div>
                 <button
-                  className="text-dorify-secondary text-xs"
+                  className="text-dorify-error text-xs"
                   onClick={() => removeItem(product.id)}
                 >
                   Удалить
@@ -80,11 +82,16 @@ export default function CartPage() {
         ))}
       </div>
 
-      {/* Bottom bar */}
-      <div className="fixed bottom-16 left-0 right-0 p-4 bg-tg-bg border-t border-gray-100">
-        <div className="flex items-center justify-between mb-3">
+      {/* Bottom bar — sits above bottom Tabbar with iOS safe-area awareness */}
+      <div
+        className="fixed left-0 right-0 px-4 py-3 bg-tg-bg shadow-sheet"
+        style={{
+          bottom: 'calc(4rem + env(safe-area-inset-bottom))',
+        }}
+      >
+        <div className="flex items-center justify-between mb-2">
           <Text className="text-tg-hint">Итого</Text>
-          <PriceTag amount={totalPrice} className="text-lg" />
+          <PriceTag amount={totalPrice} className="text-lg font-semibold" />
         </div>
         <Button
           mode="filled"
