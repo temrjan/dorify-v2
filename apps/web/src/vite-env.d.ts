@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+type TelegramEvent = 'themeChanged' | 'viewportChanged' | 'mainButtonClicked' | 'backButtonClicked';
+type TelegramPlatform = 'android' | 'android_x' | 'ios' | 'macos' | 'tdesktop' | 'web' | 'weba' | 'webk' | 'unigram' | 'unknown';
+
 interface TelegramWebApp {
   ready: () => void;
   expand: () => void;
@@ -16,6 +19,9 @@ interface TelegramWebApp {
   };
   themeParams: Record<string, string>;
   colorScheme: 'light' | 'dark';
+  platform: TelegramPlatform;
+  onEvent: (event: TelegramEvent, handler: () => void) => void;
+  offEvent: (event: TelegramEvent, handler: () => void) => void;
   MainButton: {
     text: string;
     color: string;
