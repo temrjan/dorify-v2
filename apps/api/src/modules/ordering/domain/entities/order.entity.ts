@@ -8,6 +8,9 @@ import { OrderCancelledEvent } from '../events/order-cancelled.event';
 
 export enum OrderStatus {
   PENDING = 'PENDING',
+  // Manual contact: pharmacy без Multicard creds — buyer заявка, продавец
+  // связывается напрямую. Out-transitions wire'аются в Sprint 1 Day 6.
+  PENDING_MANUAL_CONTACT = 'PENDING_MANUAL_CONTACT',
   CONFIRMED = 'CONFIRMED',
   PREPARING = 'PREPARING',
   READY = 'READY',
@@ -26,6 +29,7 @@ export enum PaymentStatus {
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+  [OrderStatus.PENDING_MANUAL_CONTACT]: [],
   [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
   [OrderStatus.PREPARING]: [OrderStatus.READY],
   [OrderStatus.READY]: [OrderStatus.DELIVERING],

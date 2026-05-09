@@ -1,4 +1,5 @@
-import { Injectable, ConflictException, NotFoundException, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, Inject, UnauthorizedException, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { config } from '@core/config/env.config';
@@ -9,7 +10,8 @@ import { PHARMACY_REPOSITORY } from '../domain/repositories/pharmacy.repository'
 import type { PharmacyRepository } from '../domain/repositories/pharmacy.repository';
 import { Pharmacy } from '../domain/entities/pharmacy.entity';
 import { PhoneNumber } from '../domain/value-objects/phone-number.vo';
-import type { CreatePharmacyDto, UpdatePharmacyDto, UpdatePaymentSettingsDto, PharmacyResponse, PaymentSettingsResponse } from './dto/pharmacy.dto';
+import { PharmacyCreatedEvent, PharmacyVerifiedEvent, PharmacyRejectedEvent } from '../domain/events';
+import type { CreatePharmacyDto, UpdatePharmacyDto, UpdatePaymentSettingsDto, PharmacyResponse, PaymentSettingsResponse, SlugAvailabilityResponse } from './dto/pharmacy.dto';
 import type { AdminLoginDto, AuthResponse } from './dto/auth.dto';
 
 // Temporary admin credentials (should be in DB in production)
@@ -18,10 +20,13 @@ const ADMIN_PASSWORD_HASH = bcrypt.hashSync('dorify2026!secure', 10);
 
 @Injectable()
 export class IamService {
+  private readonly logger = new Logger(IamService.name);
+
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepo: UserRepository,
     @Inject(PHARMACY_REPOSITORY) private readonly pharmacyRepo: PharmacyRepository,
     private readonly encryption: EncryptionService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async adminLogin(dto: AdminLoginDto): Promise<AuthResponse> {
@@ -78,7 +83,69 @@ export class IamService {
       await this.userRepo.save(user);
     }
 
+    this.emit(new PharmacyCreatedEvent({
+      pharmacyId: pharmacy.getId(),
+      ownerId,
+      name: pharmacy.name,
+      slug: pharmacy.slug,
+    }));
+
     return this.toPharmacyResponse(pharmacy);
+  }
+
+  async verifyPharmacy(pharmacyId: string): Promise<PharmacyResponse> {
+    const pharmacy = await this.pharmacyRepo.findById(pharmacyId);
+    if (!pharmacy) {
+      throw new NotFoundException(`Pharmacy ${pharmacyId} not found`);
+    }
+
+    pharmacy.verify();
+    await this.pharmacyRepo.save(pharmacy);
+
+    this.emit(new PharmacyVerifiedEvent({
+      pharmacyId: pharmacy.getId(),
+      ownerId: pharmacy.ownerId,
+      slug: pharmacy.slug,
+      name: pharmacy.name,
+    }));
+
+    return this.toPharmacyResponse(pharmacy);
+  }
+
+  async rejectPharmacy(pharmacyId: string, reason: string): Promise<PharmacyResponse> {
+    const pharmacy = await this.pharmacyRepo.findById(pharmacyId);
+    if (!pharmacy) {
+      throw new NotFoundException(`Pharmacy ${pharmacyId} not found`);
+    }
+
+    pharmacy.reject(reason);
+    await this.pharmacyRepo.save(pharmacy);
+
+    this.emit(new PharmacyRejectedEvent({
+      pharmacyId: pharmacy.getId(),
+      ownerId: pharmacy.ownerId,
+      reason,
+    }));
+
+    return this.toPharmacyResponse(pharmacy);
+  }
+
+  async checkSlugAvailability(slug: string): Promise<SlugAvailabilityResponse> {
+    const normalized = slug.trim().toLowerCase();
+    const existing = await this.pharmacyRepo.findBySlug(normalized);
+    if (!existing) {
+      return { available: true };
+    }
+
+    // Suggest first free numeric suffix (foo → foo-2, foo-3, …)
+    for (let i = 2; i <= 99; i++) {
+      const candidate = `${normalized}-${i}`;
+      const taken = await this.pharmacyRepo.findBySlug(candidate);
+      if (!taken) {
+        return { available: false, suggestion: candidate };
+      }
+    }
+    return { available: false };
   }
 
   async getPharmacyProfile(ownerId: string): Promise<PharmacyResponse> {
@@ -145,6 +212,11 @@ export class IamService {
       multicardStoreId: pharmacy.multicardStoreId,
       multicardSecret: this.maskSecret(dto.multicardSecret),
     };
+  }
+
+  private emit(event: { eventName: string }): void {
+    this.eventEmitter.emit(event.eventName, event);
+    this.logger.log(`Published event: ${event.eventName}`);
   }
 
   private maskSecret(plaintext: string): string {

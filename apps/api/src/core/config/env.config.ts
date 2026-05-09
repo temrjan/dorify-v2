@@ -22,6 +22,9 @@ const EnvSchema = z.object({
     .string()
     .regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be 64 hex chars (32 bytes for AES-256)'),
   INIT_DATA_TTL_SECONDS: z.coerce.number().default(86400),
+  // Service token for bot → admin endpoints (verify/reject pharmacy).
+  // Generate via `openssl rand -hex 32` and share between api + bot env.
+  ADMIN_SERVICE_TOKEN: z.string().min(32, 'ADMIN_SERVICE_TOKEN must be ≥32 chars'),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;

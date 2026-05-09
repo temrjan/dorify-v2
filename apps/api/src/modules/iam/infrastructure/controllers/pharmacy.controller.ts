@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Query, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { Roles, UserRole } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '@common/pipes/zod-validation.pipe';
@@ -7,6 +7,7 @@ import {
   CreatePharmacySchema,
   UpdatePharmacySchema,
   UpdatePaymentSettingsSchema,
+  CheckSlugSchema,
 } from '../../application/dto/pharmacy.dto';
 import type {
   CreatePharmacyDto,
@@ -25,6 +26,18 @@ export class PharmacyController {
     @Body(new ZodValidationPipe(CreatePharmacySchema)) dto: CreatePharmacyDto,
   ) {
     return this.iamService.createPharmacy(userId, dto);
+  }
+
+  @Get('check-slug')
+  checkSlug(@Query('slug') slug?: string) {
+    if (!slug) {
+      throw new BadRequestException('slug query param required');
+    }
+    const parsed = CheckSlugSchema.safeParse({ slug });
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.errors[0]?.message ?? 'Invalid slug');
+    }
+    return this.iamService.checkSlugAvailability(parsed.data.slug);
   }
 
   @Get('profile')
