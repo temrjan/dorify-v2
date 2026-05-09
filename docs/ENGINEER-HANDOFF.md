@@ -1,17 +1,20 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-08** (Session 2).
+> Updated: **2026-05-09** (Session 3 — Day 2 design pass complete).
 
 ---
 
 ## ⚡ TL;DR
 
 **Project:** Multi-tenant аптечный маркетплейс (Telegram Mini App). Миграция Express MVC v1 → NestJS DDD v2.
-**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz`. БД пустая (нет seed data).
-**Captain language:** русский, directive-style. Устаёт от ceremony.
-**Last session shipped:** 6 PR (#5–#10) — frontend payment flow, pharmacy products CRUD, CI hardening, bot+CORS hot-fixes.
-**Pause taken:** 2026-05-08. **Next session: DESIGN PASS** — UI polish (см. `docs/design/POLISH_PLAN.md`).
+**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz`. **БД содержит seed data** (1 pharmacy «Аптека Дорифай Демо», 1 PHARMACY_OWNER user `temrjan` Telegram ID 8503214095, 7 products всех статусов).
+**Captain language:** русский, directive-style. Устаёт от ceremony. **Sequential strictly** — не запускать parallel tool calls.
+**Last sessions shipped:**
+- Session 2 (2026-05-08, 6 PR #5–#10): payment frontend flow, pharmacy CRUD, CI/bot/CORS fixes.
+- **Session 3 (2026-05-09, 11 PR #12–#22):** полный design pass v2 — foundation components, HomePage redesign, pharmacy pages polish, profile tab + theme toggle, catalog rename + master categories list.
+**Production live:** v2 frontend визуально готов, buyer flow работает (browse → cart → checkout backend ready). Pharmacy panel functional.
+**Next session:** Phase 4 backend hardening (Multicard) или Tier 2/3 (orders, admin) или продолжение polish (Checkout/PaymentResult/OrdersPage).
 
 ---
 
@@ -56,23 +59,23 @@
 
 ## Project state — phases (per `docs/DORIFY_V2_DDD.md` §10)
 
-| Фаза | Что | Статус (2026-05-08) | Что осталось |
+| Фаза | Что | Статус (2026-05-09) | Что осталось |
 |---|---|---|---|
 | 0 | Foundation (repo, pnpm, NestJS, Prisma, CI/CD) | ✅ 100% | — |
 | 1 | IAM Module | ⚠️ ~95% | JwtAuthGuard wire (пока dead code), admin creds в env |
-| 2 | Catalog Module | ✅ ~98% | + `getMyProduct` endpoint (PR #8) ✓; status filter в DTO ✓ |
+| 2 | Catalog Module | ✅ ~98% | `getMyProduct` endpoint ✓; status filter в DTO ✓; **master categories list** ✓ (PR #22) |
 | 3 | Ordering Module | ⚠️ ~90% | Admin order controller отсутствует |
-| 4 | Payment Module | ⚠️ ~85% | Frontend payment flow ✓ (PR #6); WEB_URL env ✓; OFD order-time validation, ReconcilePayments cron, CallbackIpGuard, Idempotency-Key + retry в adapter — **остаются** |
-| 5 | Frontend | ⚠️ ~60% | Pharmacy products CRUD ✓ (PR #8); `/payment/result` polling ✓ (PR #6); **UI polish ⏳ next session**; pharmacy orders list, payment-settings, profile — TODO; Admin SPA — TODO |
-| 6 | Bot + Notifications | ⚠️ ~50% | WEBAPP_URL default fix ✓ (PR #9); pharmacy registration wizard — TODO |
+| 4 | Payment Module | ⚠️ ~85% | Frontend payment flow ✓; WEB_URL env ✓. **Остаются:** OFD order-time validation, ReconcilePayments cron, CallbackIpGuard, Idempotency-Key + retry в adapter (см. `docs/multicard-1/README.md` §8) |
+| 5 | Frontend | ✅ ~85% | **Design pass v2 done** (Sessions 3): HomePage / SearchPage→CatalogPage / Cart / Pharmacy panel / Profile. Theme toggle с persistent override. `/payment/result` polling ✓. **Остаются:** Checkout polish (sticky bar OK), PaymentResult states polish, OrdersPage redesign, pharmacy orders list, pharmacy payment-settings UI, Admin SPA |
+| 6 | Bot + Notifications | ⚠️ ~50% | WEBAPP_URL default fix ✓; pharmacy registration wizard — TODO |
 | 7 | Search (Avi) | ⚠️ ~30% | Qdrant→pgvector переход (Captain decision), Product события chain, frontend AI search UI |
-| 8 | Audit + Security + Migrate | ⚠️ ~15% | AES encryption ✓; CI resilient deploy ✓ (PR #7); CORS prod-default ✓ (PR #10); миграция v1→v2 — TODO; AuditInterceptor, rate limiting, input sanitization — TODO |
+| 8 | Audit + Security + Migrate | ⚠️ ~20% | AES encryption ✓; CI resilient deploy ✓; CORS prod-default ✓; **seed скрипт** ✓ (PR #14). **TODO:** миграция v1→v2, AuditInterceptor, rate limiting, input sanitization |
 
-**Roadmap до cutover:** ~10-13 рабочих дней (после design pass + Phase 4 closure + admin SPA + migration).
+**Roadmap до cutover:** ~7-10 рабочих дней (Phase 4 closure + admin SPA + bot wizard + migration). Frontend design в основном завершён.
 
 ---
 
-## Что отгружено в этой сессии (Session 2 — 2026-05-08)
+## Что отгружено в Session 2 (2026-05-08)
 
 | PR | Содержание | Размер |
 |---|---|---|
@@ -82,32 +85,92 @@
 | #8 | `feat: pharmacy products CRUD UI` | +1147/-28 LOC |
 | #9 | `fix(bot): default WEBAPP_URL → app.dorify.uz (v2 frontend)` | +1/-1 LOC |
 | #10 | `fix(api): default ALLOWED_ORIGINS → production TWA + admin domains` | +5/-2 LOC |
+| #11 | `docs: session 2 handoff + design plan + Multicard reference` | +2991 LOC docs |
 
-### Хроника инцидентов
+## Что отгружено в Session 3 (2026-05-09) — full design pass v2
+
+| PR | Содержание | Размер |
+|---|---|---|
+| #12 | `feat(web): design foundation — theme tokens + base components` (Skeleton, EmptyState, Pill + 9 icons) | +234 LOC |
+| #13 | `feat(web): redesign HomePage + BottomNav polish` (hero card, sticky search, skeleton cards, product card design, safe-area) | +162/-70 LOC |
+| #14 | `chore(api): prisma seed for dev/staging` (idempotent seed: 1 pharmacy + 1 user + 7 products) | +213/-1 LOC |
+| #15 | `feat(web): pharmacy pages design polish` (ProductsList chip filter, count badge, ProductForm sections, ProductCard shadow-card, status pills с иконками) | +356/-252 LOC |
+| #16 | `fix(web): adaptive theme + cart/checkout safe-area padding` (AppRoot reactive appearance) | +58/-19 LOC |
+| #17 | `feat(web): profile tab + theme toggle + tabbar bg unification` (zustand themeStore, ProfilePage, tab «Заказы»→«Профиль») | +152/-9 LOC |
+| #18 | `fix(web): theme override applies to all surfaces (CSS vars + AppRoot)` (html data-attr override — был неполный) | +38/-2 LOC |
+| #19 | `fix(web): theme override — set --tg-theme-* inline on body with !important` (final fix — body inline beats Telegram's body inline) | +53/-33 LOC |
+| #20 | `fix(web): cart — inline summary+CTA вместо fixed bottom-bar` | +18/-20 LOC |
+| #21 | `feat(web): cart items clickable — navigate to ProductPage on tap` | +22/-3 LOC |
+| #22 | `feat(web): catalog rename + master categories list` (15 categories, single source) | +213/-83 LOC |
+
+### Хроника Session 3
+
+1. **Foundation first** (PR #12): theme extends + base components (Skeleton, EmptyState, Pill, IconCheck/X/Alert/Clock/Package/Store/Card/User/ChevronRight). Lucide-react **не добавлен** — расширили существующий `icons.tsx` (lucide-стиль уже был).
+
+2. **Design pass main pages** (PR #13, #15): HomePage, ProductsListPage, ProductFormPage, PharmacyHomePage — все обновлены с shadow-card / rounded-card / status pills / EmptyState / Skeleton.
+
+3. **Seed скрипт + execution** (PR #14): captain выполнил `docker compose exec -T dorify-backend npx ts-node prisma/seed.ts` через ssh. БД получила: pharmacy, user (Captain Telegram ID 8503214095), 7 products всех 5 статусов.
+
+4. **Theme adaptive** (PR #16, #17, #18, #19): прошли через 4 итерации до правильного решения:
+   - PR #16: `AppRoot appearance` reactive на Telegram colorScheme.
+   - PR #17: profile tab с theme toggle (zustand persist), tabbar bg override.
+   - PR #18 (incomplete): `html[data-theme-override]` CSS rules — не победил body inline от Telegram.
+   - PR #19 (final): `body.style.setProperty(varName, value, 'important')` — inline+important beats Telegram inline.
+
+5. **Cart UX iterations** (PR #20, #21): убрали sticky bottom bar (Captain hint «может скрол должен быть»), сделали inline summary+CTA. Cart items теперь clickable → /product/:id.
+
+6. **Catalog rename + master categories** (PR #22): SearchPage визуально стал Catalog (tab label change, URL stable). 15 категорий в `shared/constants/categories.ts` — единый source для HomePage chips, CatalogPage grid, ProductForm select. Backend permissive.
+
+### Хроника инцидентов / lessons
+
+**Session 2:**
 
 1. **CI deploy fail post-PR-#6 merge.** На сервере `/opt/dorify-v2/` имел ручные local-changes от прошлого SSH-вмешательства, `git pull` упал. Recovery: `git reset --hard origin/main && git clean -fd` → manual `docker compose build && up -d`. **Permanent fix:** PR #7 (resilient deploy в CI script).
 
-2. **Bot указывал на v1.** Default `WEBAPP_URL=https://dorify.uz` (v1 landing) в `apps/bot/src/config/index.ts`. Captain заметил smoke-test'ом. **Fix:** PR #9 default → `https://app.dorify.uz`. Также: env _file для bot — `./apps/bot/.env`, **не** общий `/opt/dorify-v2/.env` (см. `docker-compose.yml:39`).
+2. **Bot указывал на v1.** Default `WEBAPP_URL=https://dorify.uz` (v1 landing) в `apps/bot/src/config/index.ts`. Captain заметил smoke-test'ом. **Fix:** PR #9 default → `https://app.dorify.uz`. Также: env_file для bot — `./apps/bot/.env`, **не** общий `/opt/dorify-v2/.env` (см. `docker-compose.yml:39`).
 
 3. **CORS «Network Error» в browser.** Default `ALLOWED_ORIGINS='*'` несовместим с `credentials:true`. На сервере env содержал старый список без `app.dorify.uz`. **Fix env:** Engineer SSH-ом sed-нул env + `docker compose up -d --force-recreate dorify-backend` (`restart` НЕ перечитывает env_file). **Code fix:** PR #10 default → prod-домены явно.
+
+**Session 3:**
+
+4. **Theme override через CSS html-rules не работал.** PR #18 ставил `html[data-theme-override]` block с CSS vars override — но **Telegram WebApp injects `--tg-theme-*` vars inline на `<body>`**, и body's inline специфичнее html-attribute selector при var lookup. **Fix (PR #19):** в App.tsx useEffect ставит vars **inline на document.body** через `body.style.setProperty(varName, value, 'important')`. Inline+important перебивает Telegram's non-important inline.
+
+5. **Sticky bottom bar — анти-pattern в TWA.** PR #16 оставил sticky bar на cart с `bottom: 4rem` (assumed TabBar height 64px). Captain видел перекрытие — TabBar на Android ~80px+ inc. safe-area. **Fix (PR #20):** убрали sticky bar, сделали inline summary+CTA после items. Контент scroll'ится, no magic numbers, работает на любой платформе. **Применять для всех buyer-CTAs.** Pharmacy ProductForm — sticky OK (длинная форма, нужен accessible save).
+
+6. **`docker compose restart` не перечитывает env_file.** Captain после env-edit делал `restart` — изменение не применялось. **Fix:** `docker compose up -d --force-recreate <service>`.
+
+7. **Production seed: ts-node в production image есть** (через `node_modules/.bin/ts-node` или `npx ts-node`). pnpm нет — image используется `node` runtime. **Команда:** `docker compose exec -T dorify-backend npx ts-node prisma/seed.ts`.
+
+8. **Tabbar bg от @telegram-apps/telegram-ui не tied к theme vars.** CSS module hashed class содержит `Tabbar_wrapper`. **Override (PR #17):** `[class*="Tabbar_wrapper"] { background: var(--tg-theme-secondary-bg-color) !important; }` в `index.css`.
 
 ### Производственные доступы (что точно сейчас работает)
 
 - `https://api.dorify.uz/api/v1/health` → `{status:ok,service:dorify-api}`
-- `https://app.dorify.uz/` → v2 TWA (HomePage с banner Dorify, search, chips категорий, grid товаров — пустой т.к. БД пустая)
-- `https://app.dorify.uz/pharmacy` → 4-card hub
-- `https://app.dorify.uz/pharmacy/products` → list page (требует Telegram WebApp + pharmacy_owner в БД, в browser возвращает 401 — норма)
-- `https://app.dorify.uz/payment/result?orderId=...` → polling page
-- Telegram bot `/start` → кнопки «Открыть маркетплейс» / «Панель аптеки» открывают app.dorify.uz
-- CORS allowed origins: `app.dorify.uz`, `pharmacy.dorify.uz`, `admin.dorify.uz`
+- `https://app.dorify.uz/` → v2 HomePage: hero card «Dorify», sticky search, 16 chips («Все» + 15 категорий с emoji), grid product cards с shadow-card. **2 published товара** (Парацетамол + Витамин C от seed).
+- `https://app.dorify.uz/search` (label «Каталог»): default = 2-col grid 15 категорий с emoji. Tap → filter products. Search input независим. «Популярные запросы» chips.
+- `https://app.dorify.uz/cart`: clickable cart items → /product/:id. Inline summary+CTA в конце items (no fixed bar).
+- `https://app.dorify.uz/profile`: user card (Тимур + @temrjan), theme toggle (Системная/Светлая/Тёмная — persist в localStorage), link «Мои заказы».
+- `https://app.dorify.uz/pharmacy`: 4-card hub с иконками (только «Мои товары» active).
+- `https://app.dorify.uz/pharmacy/products`: 7 seed-products со status pills (PUBLISHED/PENDING/REJECTED/DRAFT/HIDDEN). В browser → 401 (нужен Telegram initData).
+- `https://app.dorify.uz/payment/result?orderId=...`: polling page.
+- Telegram bot `@dorify` `/start` → кнопки → app.dorify.uz / app.dorify.uz/pharmacy.
+- CORS: `app.dorify.uz`, `pharmacy.dorify.uz`, `admin.dorify.uz`.
+
+### Seed data в production БД
+
+- **Pharmacy:** «Аптека Дорифай Демо» (slug `dorify-demo`, isActive+isVerified, deliveryEnabled, deliveryPrice 15000).
+- **User:** PHARMACY_OWNER, telegramId=8503214095 (Captain Тимур), username=temrjan.
+- **Products:** 7 штук: Парацетамол 500мг (PUBLISHED), Витамин C 500мг (PUBLISHED), Ибупрофен 200мг (PENDING_MODERATION), Амоксициллин 500мг (REJECTED — moderationNote), Омега-3 1000мг (DRAFT), Кетопрофен гель / Магний B6 (HIDDEN).
+- **Re-seed команда:** `ssh 7demo` → `docker compose -f /opt/dorify-v2/docker-compose.yml exec -T dorify-backend npx ts-node prisma/seed.ts` (idempotent — pharmacy/user upsert; products деletes+recreates).
 
 ### Известные функциональные ограничения
 
-- БД пустая. Нет товаров, аптек, юзеров. Smoke test реального flow требует seed.
-- Pharmacy panel в обычном браузере недоступен (нет Telegram initData → 401).
+- Pharmacy panel в обычном браузере недоступен (нет Telegram initData → 401). Norm.
 - Multi-pharmacy cart на checkout «degraded» — N invoices, не split. Решение — Multicard split-pivot, см. `docs/multicard-1/README.md`.
 - Order panel для аптеки и Admin SPA отсутствуют.
-- `apps/bot/.env` ≠ `/opt/dorify-v2/.env` — env-edits для бота нужны в первом файле, контейнер требует force-recreate (не restart).
+- Backend categories permissive (любая string). UI master list только enforces UI workflow — direct API call может попасть arbitrary string.
+- Multicard adapter без retry / Idempotency-Key / IP whitelist — Phase 4 closure pending.
+- `apps/bot/.env` ≠ `/opt/dorify-v2/.env` — env-edits для бота нужны в первом файле; `restart` НЕ перечитывает env_file → `up -d --force-recreate`.
 
 ---
 
@@ -186,9 +249,10 @@ Codex стандарты в `~/Codex/standards/`:
 2. **Admin SPA** — строить заново vs адаптировать v1.
 3. **Pharmacy registration mechanism** — Bot wizard (Grammy conversations) основной канал. Web-based registration через TMA — открытый.
 4. **Migration v1→v2** — extraction скрипт. План на отдельный sprint в Phase 8.
-5. **Seed data для production** — нужен для real smoke testing. Manual SQL vs proper seed script vs migration v1→v2 — не решено.
+5. **Backend strict category enforcement** — backend сейчас permissive (любая string). UI master list — только UI enforcement. Если хочется strict — backend `category: z.enum(...)` + migration. Decide когда понадобится.
+6. **Расширение master categories list** — 15 категорий покрывают MVP. Если pharmacy онбординг покажет gaps (новые типы товаров) — добавить через PR в `apps/web/src/shared/constants/categories.ts`.
 
-## Captain decisions log (closed по 2026-05-08)
+## Captain decisions log (closed по 2026-05-09)
 
 - pgvector (vs Qdrant) — vector store
 - service-per-module (vs CQRS) — pattern (`@nestjs/cqrs` удалён)
@@ -200,52 +264,80 @@ Codex стандарты в `~/Codex/standards/`:
 - Multicard sandbox `dev-mesh.multicard.uz` для dev, prod `mesh.multicard.uz`
 - Multicard callback IP whitelist `195.158.26.90` (canonical), env-overridable
 - Frontend payment flow: redirect Multicard checkout (PR #6) — embedded НЕ выбрали
-- Pharmacy products CRUD UI: free-form categories с datalist, nested routing, default-all status filter, confirm-dialog delete (PR #8)
+- Pharmacy products CRUD UI: free-form categories (был, теперь changed) → master list, nested routing, default-all status filter, confirm-dialog delete (PR #8)
 - Multicard architectural model: pivot на platform-as-merchant + split (deferred до операционных ответов)
+- **Session 3 closures:**
+  - Design pass scope: всё buyer-facing (HomePage, Catalog, Cart, Profile) + Pharmacy panel. Sticky bar НЕ в Cart (inline scroll), но в ProductForm — оставить (длинная форма).
+  - Theme toggle: native zustand persist + Telegram colorScheme fallback («Системная»). Override через body inline `setProperty(... !important)`.
+  - Categories: hardcoded master list, single source `shared/constants/categories.ts` (Option A).
+  - Tab «Заказы» → «Профиль». Orders доступен через ссылку в /profile.
+  - Tab label «Поиск» → «Каталог». URL path `/search` оставлен (стабильность).
 
 Все decisions — в `REVIEWER-LOG.md`.
 
 ---
 
-## Priorities для cutover (после design pass)
+## Priorities для cutover (после Session 3 design pass)
 
 **Tier 1: Buyer может купить лекарство**
 1. ✅ AES + real Multicard backend (PR #4)
 2. ✅ Frontend payment flow (PR #6)
-3. ⏳ **Phase 4 closure:** OFD order-time validation + reconciliation cron + IP whitelist guard + Idempotency-Key/retry в adapter (см. `docs/multicard-1/README.md` §8)
+3. ⏳ **Phase 4 closure:** OFD order-time validation + reconciliation cron + IP whitelist guard + Idempotency-Key/retry в adapter (см. `docs/multicard-1/README.md` §8). **Сейчас самый блокирующий пункт перед prod-ready buyer flow.**
 
 **Tier 2: Аптека может работать в v2**
-4. ✅ Pharmacy panel — products CRUD UI (PR #8)
-5. ⏳ Pharmacy panel — payment-settings UI (Multicard credentials)
+4. ✅ Pharmacy panel — products CRUD UI (PR #8 + PR #15 polish)
+5. ⏳ Pharmacy panel — payment-settings UI (Multicard credentials per-pharmacy)
 6. ⏳ Pharmacy panel — orders list + profile edit
 7. ⏳ Bot pharmacy registration wizard (Grammy conversations)
 
 **Tier 3: Админ может работать**
-8. ⏳ env-vars admin creds + JwtAuthGuard wire + Admin SPA
+8. ⏳ env-vars admin creds + JwtAuthGuard wire + Admin SPA (login, product moderation, pharmacy verify, orders/payments view)
 
 **Tier 4: Cutover**
-9. ⏳ Data migration script v1→v2
+9. ⏳ Data migration script v1→v2 (extraction users / pharmacies / products / orders / payments + re-encrypt Multicard secrets)
 10. ⏳ Параллельный запуск + smoke
 11. ⏳ DNS switch + monitor 24h
 
+**Frontend Polish (опциональное завершение Session 3 backlog):**
+- ⏳ OrdersPage redesign (один из последних buyer-pages в старом стиле).
+- ⏳ ProductPage review (детальная карточка товара — visual check).
+- ⏳ Checkout / PaymentResult минорный polish (sticky bars работают, но visuals можно улучшить).
+
 ---
 
-## ⏭ Next session — DESIGN PASS
+## ⏭ Next session — три вероятных направления
 
-Captain explicit (2026-05-08, end of session 2):
-> «Пауза. Изучи всю документацию ... начнем с дизайна.»
+Session 3 закрыл дизайн-пасс v2 (см. PR #12-#22, marked в POLISH_PLAN.md). Captain в финале сессии: «обнови документацию, опиши где мы что впереди».
 
-Полный план + scope: **`docs/design/POLISH_PLAN.md`**.
+### Опция A — Phase 4 backend hardening (Multicard)
 
-Краткое summary:
-- Pages to redesign: HomePage, ProductsListPage, ProductFormPage, PharmacyHomePage, PaymentResultPage, CheckoutPage.
-- Components: cards с shadows + hover, status pills с иконками, skeletons вместо Spinner, empty-states с illustration tone.
-- Bottom navigation: иконки SF Symbols-style (сейчас есть базовые иконки, можно улучшить).
-- Color/typography hierarchy + spacing rhythm.
-- НЕ trogать: telegram-ui core (используем как base), backend logic.
-- Estimate: ~2-3 дня на качественный pass.
+**Самый высокоприоритетный backend gap.** Без него реальный buyer flow не prod-ready на финансовом уровне.
 
-После design pass — снова открыты Tier 1 #3 (Phase 4 closure), Tier 2 #5/#6/#7, Tier 3 #8.
+Items (per `docs/multicard-1/README.md` §8):
+- IP whitelist guard на `/payments/callback` — defense-in-depth.
+- Idempotency-Key + Retry с exp backoff в `multicard.adapter.ts` — financial integrity.
+- Amount validation в callback (callback.amount === payment.amount).
+- ThrottlerModule skip для `/payments/callback` (Multicard burst).
+- OFD order-time validation в ordering domain.
+- Reconcile cron на PENDING > 10 min.
+- Reuse existing PENDING payment (fix duplicate row pre-existing bug).
+
+Estimate: ~6-8 часов (атомарные PR'ы).
+
+### Опция B — Tier 2/3 продолжение
+
+- **Tier 2 #6** Pharmacy panel — orders list (read-only ~1.5 дня).
+- **Tier 2 #5** Pharmacy panel — payment-settings (Multicard creds form, ~1 день).
+- **Tier 2 #7** Bot pharmacy registration wizard (Grammy conversations, ~2 дня).
+- **Tier 3 #8** Admin SPA + JwtAuthGuard wire (~4 дня).
+
+### Опция C — Design pass extension
+
+OrdersPage / ProductPage / Checkout / PaymentResult — minor visual polish с применением foundation. ~3-4 часа.
+
+### Опция D — Pause / Multicard reactivation
+
+Если придут ответы от Multicard support (PDF inquiry на Captain's Desktop) — pivot к platform-as-merchant + split (см. `docs/multicard-1/README.md` §6).
 
 ---
 
@@ -265,18 +357,46 @@ Captain explicit (2026-05-08, end of session 2):
 - `prisma/schema.prisma` — schema
 
 ### Frontend (`apps/web/`)
-- `src/app/router.tsx` — routes (HomePage, ProductPage, SearchPage, CartPage, CheckoutPage, **PaymentResultPage** (PR #6), OrdersPage, PharmacyPanelPage)
-- `src/app/Layout.tsx` — Layout с bottom nav (Главная/Поиск/Корзина/Заказы)
-- `src/features/checkout/ui/CheckoutPage.tsx` — single-pharmacy → paymentsApi.create → window.location → Multicard
-- `src/features/payment/ui/PaymentResultPage.tsx` — polling 2s, 60s timeout, UI states
-- `src/features/pharmacy-panel/ui/PharmacyPanelPage.tsx` — Layout с nested Routes (PR #8)
-- `src/features/pharmacy-panel/ui/PharmacyHomePage.tsx` — 4-card hub (PR #8)
-- `src/features/pharmacy-panel/ui/products/ProductsListPage.tsx` — list + filters + delete confirm (PR #8)
-- `src/features/pharmacy-panel/ui/products/ProductFormPage.tsx` — loader + inner form, OFD accordion (PR #8)
-- `src/features/pharmacy-panel/ui/products/components/{ProductCard,ProductStatusBadge}.tsx` (PR #8)
-- `src/shared/api/{client,products,orders,payments,pharmacyProducts}.ts` — API helpers
-- `src/shared/types/index.ts` — Product (с moderationNote, packageCode после PR #8)
-- `src/vite-env.d.ts` — TelegramWebApp typings (включая openLink после PR #6)
+
+**App entry / routing:**
+- `src/main.tsx` — render `<App />` без AppRoot (вынесен в App.tsx после PR #16/#17).
+- `src/app/App.tsx` — AppRoot reactive с Telegram colorScheme + theme override через body inline `setProperty(... !important)` (PR #19).
+- `src/app/router.tsx` — routes: HomePage, ProductPage, SearchPage (=Catalog), CartPage, CheckoutPage, PaymentResultPage, OrdersPage, **ProfilePage** (PR #17), PharmacyPanelPage.
+- `src/app/Layout.tsx` — bottom nav 4 tabs (Главная / **Каталог** / Корзина / **Профиль**), hidden на /pharmacy/* /checkout /product/* /payment/*.
+
+**Buyer pages (Session 3 redesigned):**
+- `src/features/home/ui/HomePage.tsx` — hero card, sticky search, chips («Все» + 15 master categories), skeleton cards, EmptyState (PR #13).
+- `src/features/search/ui/SearchPage.tsx` — Catalog: 2-col grid категорий + search input + popular queries chips + EmptyState (PR #22).
+- `src/features/cart/ui/CartPage.tsx` — clickable items → /product/:id, inline summary+CTA, no fixed bar (PR #20, #21).
+- `src/features/checkout/ui/CheckoutPage.tsx` — single-pharmacy → paymentsApi.create → window.location → Multicard. Sticky bottom-bar (PR #6).
+- `src/features/payment/ui/PaymentResultPage.tsx` — polling 2s, 60s timeout, UI states (PR #6).
+- `src/features/profile/ui/ProfilePage.tsx` — user card + theme toggle + orders link (PR #17).
+- `src/features/orders/ui/OrdersPage.tsx` — buyer orders (старый стиль, не redesigned).
+- `src/features/product/ui/ProductPage.tsx` — детальная карточка (старый стиль).
+
+**Pharmacy panel (Session 3 redesigned):**
+- `src/features/pharmacy-panel/ui/PharmacyPanelPage.tsx` — Layout с nested Routes.
+- `src/features/pharmacy-panel/ui/PharmacyHomePage.tsx` — 4-card hub с иконками (PR #15).
+- `src/features/pharmacy-panel/ui/products/ProductsListPage.tsx` — chip filters, count badge, sticky search, EmptyState (PR #15).
+- `src/features/pharmacy-panel/ui/products/ProductFormPage.tsx` — Section + Field components, sticky save bar (длинная форма), select для категорий (PR #15, #22).
+- `src/features/pharmacy-panel/ui/products/components/{ProductCard,ProductStatusBadge}.tsx` — Pill-based status (PR #15).
+
+**Shared (Session 3 new):**
+- `src/shared/ui/Skeleton.tsx` — wrapper над animate-pulse + SkeletonCard preset (PR #12).
+- `src/shared/ui/EmptyState.tsx` — slot icon/title/description/action (PR #12).
+- `src/shared/ui/Pill.tsx` — multi-purpose chip 6 variants × 2 sizes (PR #12).
+- `src/shared/ui/icons.tsx` — кастомные SVG в lucide-стиле (PR #12 — 9 новых).
+- `src/shared/stores/themeStore.ts` — zustand persist для theme override (PR #17).
+- `src/shared/constants/categories.ts` — master 15 категорий (PR #22).
+
+**Theme / styles:**
+- `src/index.css` — Tailwind + Telegram theme utilities + Tabbar bg override.
+- `tailwind.config.ts` — extends: dorify success/warning/error, shadows scale, rounded-card/sheet (PR #12).
+
+**API helpers / types:**
+- `src/shared/api/{client,products,orders,payments,pharmacyProducts}.ts`
+- `src/shared/types/index.ts`
+- `src/vite-env.d.ts` — TelegramWebApp typings (openLink, platform, onEvent — PR #6, #16).
 
 ### Bot (`apps/bot/`)
 - `src/config/index.ts` — Zod env (`WEBAPP_URL` default `https://app.dorify.uz` после PR #9)
@@ -287,13 +407,13 @@ Captain explicit (2026-05-08, end of session 2):
 - `.github/workflows/ci.yml` — lint+test+build job + deploy job (resilient pull после PR #7)
 
 ### Docs
-- `docs/DORIFY_V2_DDD.md` — full design doc, 1525 строк, §10 phase plan
-- `docs/MULTICARD_API_DOCUMENTATION.md` — Multicard API reference
-- `docs/TEAM-CONSTITUTION.md` v1.3 — operating manual
-- `docs/ENGINEER-HANDOFF.md` — этот файл
-- `docs/multicard-1/README.md` — Multicard integration context (1045 строк): API концепции, текущее состояние реализации, регрессии vs v1, архитектурный pivot, Phase 4 closure план, open questions
-- **`docs/design/POLISH_PLAN.md`** — план design pass для следующей сессии
-- `REVIEWER-LOG.md` — Reviewer calibration + Captain decisions log
+- `docs/DORIFY_V2_DDD.md` — full design doc, 1525 строк, §10 phase plan.
+- `docs/MULTICARD_API_DOCUMENTATION.md` — Multicard API reference.
+- `docs/TEAM-CONSTITUTION.md` v1.3 — operating manual.
+- `docs/ENGINEER-HANDOFF.md` — этот файл (Session 3 update).
+- `docs/multicard-1/README.md` — Multicard integration context (1045 строк): API концепции, текущее состояние реализации, регрессии vs v1, архитектурный pivot, Phase 4 closure план, open questions.
+- **`docs/design/POLISH_PLAN.md`** — план design pass (Session 3 finished — большинство blocks ✅).
+- `REVIEWER-LOG.md` — Reviewer calibration + Captain decisions log.
 
 ### Outgoing artifacts
 - `~/Desktop/marketplace-payment-inquiry.pdf` — generic 1-page A4 inquiry для Multicard / Click / Payme / Uzum support о split feature.
@@ -309,11 +429,11 @@ cat .claude/workflow-state.json
 # 2. Read this handoff
 cat docs/ENGINEER-HANDOFF.md
 
-# 3. If next-up = design pass → читай docs/design/POLISH_PLAN.md
-cat docs/design/POLISH_PLAN.md
-
-# 4. If next-up = Multicard → читай docs/multicard-1/README.md
+# 3. If next-up = Phase 4 backend → читай docs/multicard-1/README.md §8
 cat docs/multicard-1/README.md
+
+# 4. If next-up = design polish → docs/design/POLISH_PLAN.md (большинство blocks done в Session 3)
+cat docs/design/POLISH_PLAN.md
 
 # 5. Read REVIEWER-LOG.md (Captain decisions)
 cat REVIEWER-LOG.md
