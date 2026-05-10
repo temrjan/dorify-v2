@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { generateId } from '@shared/domain';
-import { ORDER_REPOSITORY } from '../domain/repositories/order.repository';
+import { ORDER_REPOSITORY, InsufficientStockError } from '../domain/repositories/order.repository';
 import type { OrderRepository } from '../domain/repositories/order.repository';
 import { PRODUCT_REPOSITORY } from '../../catalog/domain/repositories/product.repository';
 import type { ProductRepository } from '../../catalog/domain/repositories/product.repository';
@@ -81,10 +81,27 @@ export class OrderingService {
       initialStatus,
     });
 
-    // 3. Save
-    await this.orderRepo.save(order);
+    // 4. Persist atomically — decrement stock + create order in a single
+    //    Postgres transaction with row-level lock на products. Closes
+    //    audit S-HIGH-4: prior flow validated stock в memory then saved
+    //    order, with stock decrement async via OnOrderCreated handler.
+    //    Two concurrent buyers могли пройти validation одновременно для
+    //    последнего товара. placeAtomically combines decrement + create
+    //    в одну atomic UPDATE WHERE — lost-update prevented at DB level.
+    try {
+      await this.orderRepo.placeAtomically(order);
+    } catch (error) {
+      if (error instanceof InsufficientStockError) {
+        throw new ForbiddenException(
+          `Insufficient stock — товар закончился, пока вы оформляли заказ.`,
+        );
+      }
+      throw error;
+    }
 
-    // 4. Publish Domain Events (OrderCreated → DecrementStock, CreateInvoice)
+    // 5. Publish Domain Events (OrderCreated → CreateInvoice). Stock
+    //    decrement УЖЕ произошёл атомарно выше — ранее был отдельный
+    //    OnOrderCreatedDecrementStock event handler, теперь redundant.
     const events = order.pullDomainEvents();
     for (const event of events) {
       this.eventEmitter.emit(event.eventName, event);

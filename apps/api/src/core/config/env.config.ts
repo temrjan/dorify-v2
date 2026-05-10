@@ -48,6 +48,14 @@ const EnvSchema = z.object({
     .string()
     .default('')
     .transform((val) => val.split(',').map((s) => s.trim()).filter(Boolean).map(Number)),
+  // Multicard callback IP whitelist (audit S-CRIT-4). Default — canonical
+  // IP per docs/MULTICARD_API_DOCUMENTATION.md:266. Comma-separated для
+  // failover IPs. Behind Caddy reverse proxy: `request.ip` resolves via
+  // X-Forwarded-For (app.set('trust proxy', 1) в main.ts).
+  MULTICARD_CALLBACK_IPS: z
+    .string()
+    .default('195.158.26.90')
+    .transform((val) => val.split(',').map((s) => s.trim()).filter(Boolean)),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
