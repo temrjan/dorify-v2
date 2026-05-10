@@ -6,9 +6,7 @@ import { becomePharmacyApi } from '../api';
 interface SlugFieldProps {
   /** Current slug value (controlled). */
   value: string;
-  /** When true, derives slug automatically from `nameSource` until user manually edits. */
-  autoFromName: boolean;
-  /** Source name for auto-translit when `autoFromName` is true. */
+  /** Source name for auto-translit while user не редактировал slug вручную. */
   nameSource: string;
   /** Validation error from form-level validation. */
   error?: string;
@@ -24,7 +22,6 @@ function normalize(input: string): string {
 
 export function SlugField({
   value,
-  autoFromName,
   nameSource,
   error,
   onChange,
@@ -32,29 +29,34 @@ export function SlugField({
 }: SlugFieldProps) {
   const [status, setStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [suggestion, setSuggestion] = useState<string | undefined>();
+  // Auto-derive enabled until user edits либо taps suggestion. Owned
+  // INTERNALLY — раньше parent flipped flag через shared onChange callback,
+  // что ломало последующие keystrokes (auto-derive emit → parent flips →
+  // next char skipped). Now SlugField solely decides когда auto-derive.
+  const [autoFromName, setAutoFromName] = useState(() => value.length === 0);
 
-  // Auto-derive slug from name until user manually edits.
+  // Auto-derive slug from name. Skipped после user edit либо tap suggestion.
   useEffect(() => {
-    if (autoFromName) {
-      const derived = normalize(nameSource);
-      if (derived !== value) {
-        onChange(derived);
-      }
+    if (!autoFromName) return;
+    const derived = normalize(nameSource);
+    if (derived !== value) {
+      onChange(derived);
     }
-    // We intentionally exclude `value` and `onChange` to avoid loops.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFromName, nameSource]);
+  }, [autoFromName, nameSource, value, onChange]);
 
-  // Debounced availability check.
+  // Debounced availability check. setState calls deferred внутрь setTimeout
+  // → не triggers cascading renders (react-hooks/immutability rule).
   useEffect(() => {
     const trimmed = value.trim();
     if (trimmed.length < 2) {
-      setStatus('idle');
-      setSuggestion(undefined);
-      onAvailabilityChange(false);
-      return;
+      const handle = setTimeout(() => {
+        setStatus('idle');
+        setSuggestion(undefined);
+        onAvailabilityChange(false);
+      }, 0);
+      return () => clearTimeout(handle);
     }
-    setStatus('checking');
+    const checkingHandle = setTimeout(() => setStatus('checking'), 0);
     const handle = setTimeout(async () => {
       try {
         const result = await becomePharmacyApi.checkSlug(trimmed);
@@ -73,7 +75,10 @@ export function SlugField({
         onAvailabilityChange(true);
       }
     }, DEBOUNCE_MS);
-    return () => clearTimeout(handle);
+    return () => {
+      clearTimeout(checkingHandle);
+      clearTimeout(handle);
+    };
   }, [value, onAvailabilityChange]);
 
   const helperText = (() => {
@@ -102,7 +107,11 @@ export function SlugField({
       <Input
         placeholder="apteka-siti"
         value={value}
-        onChange={(e) => onChange(normalize(e.target.value))}
+        onChange={(e) => {
+          // User manual edit — disable auto-derive до конца сессии.
+          setAutoFromName(false);
+          onChange(normalize(e.target.value));
+        }}
         status={status === 'taken' || error ? 'error' : undefined}
       />
       <Text className="text-xs text-tg-hint mt-1 block break-all">
@@ -114,7 +123,10 @@ export function SlugField({
       {status === 'taken' && suggestion && (
         <button
           type="button"
-          onClick={() => onChange(suggestion)}
+          onClick={() => {
+            setAutoFromName(false);
+            onChange(suggestion);
+          }}
           className="mt-1 text-xs text-dorify-primary underline"
         >
           Использовать «{suggestion}»

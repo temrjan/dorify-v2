@@ -6,19 +6,14 @@ import type { WizardErrors, WizardState } from '../types';
 interface Step1Props {
   state: WizardState;
   errors: WizardErrors;
-  /** Whether slug should auto-derive from name (turns false on manual edit). */
-  autoSlug: boolean;
   onChange: <K extends keyof WizardState>(key: K, value: WizardState[K]) => void;
-  onAutoSlugChange: (auto: boolean) => void;
   onSlugAvailabilityChange: (available: boolean) => void;
 }
 
 export function Step1Basic({
   state,
   errors,
-  autoSlug,
   onChange,
-  onAutoSlugChange,
   onSlugAvailabilityChange,
 }: Step1Props) {
   return (
@@ -35,13 +30,9 @@ export function Step1Basic({
 
         <SlugField
           value={state.slug}
-          autoFromName={autoSlug}
           nameSource={state.name}
           error={errors.slug}
-          onChange={(slug) => {
-            onAutoSlugChange(false);
-            onChange('slug', slug);
-          }}
+          onChange={(slug) => onChange('slug', slug)}
           onAvailabilityChange={onSlugAvailabilityChange}
         />
 
