@@ -78,7 +78,6 @@ export default function BecomePharmacyPage() {
   const [step, setStep] = useState<StepNumber>(1);
   const [state, setState] = useState<WizardState>(INITIAL_STATE);
   const [errors, setErrors] = useState<WizardErrors>({});
-  const [autoSlug, setAutoSlug] = useState(true);
   const [slugAvailable, setSlugAvailable] = useState(false);
 
   // Telegram BackButton
@@ -196,9 +195,7 @@ export default function BecomePharmacyPage() {
         <Step1Basic
           state={state}
           errors={errors}
-          autoSlug={autoSlug}
           onChange={updateField}
-          onAutoSlugChange={setAutoSlug}
           onSlugAvailabilityChange={setSlugAvailable}
         />
       )}
