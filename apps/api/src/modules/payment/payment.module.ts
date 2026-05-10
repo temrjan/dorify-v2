@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { IamModule } from '../iam/iam.module';
 import { OrderingModule } from '../ordering/ordering.module';
 import { PaymentService } from './application/payment.service';
+import { ReconcilePaymentsCron } from './application/reconcile-payments.cron';
 import { OnPaymentConfirmedHandler } from './application/event-handlers/on-payment-confirmed.handler';
 import { PaymentController } from './infrastructure/controllers/payment.controller';
 import { MulticardCallbackIpGuard } from './infrastructure/guards/multicard-callback-ip.guard';
@@ -15,6 +16,7 @@ import { PAYMENT_GATEWAY } from './domain/ports/payment-gateway.port';
   controllers: [PaymentController],
   providers: [
     PaymentService,
+    ReconcilePaymentsCron,
     OnPaymentConfirmedHandler,
     MulticardCallbackIpGuard,
     { provide: PAYMENT_REPOSITORY, useClass: PrismaPaymentRepository },

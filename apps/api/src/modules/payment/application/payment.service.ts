@@ -186,4 +186,85 @@ export class PaymentService {
       secret: this.encryption.decrypt(pharmacy.multicardSecret),
     };
   }
+
+  /**
+   * Reconciles payments stuck в PENDING longer than `thresholdMinutes` against
+   * the gateway. Used by ReconcilePaymentsCron to recover from dropped
+   * callbacks (network issues, gateway outage). Audit S-MED-3 / Phase 4
+   * closure: callback может не дойти, но gateway знает реальный статус.
+   *
+   * Flow per stale payment:
+   * 1. Skip если pharmacy creds gone (pharmacy deactivated mid-flight)
+   * 2. Query gateway.getInvoiceStatus
+   * 3. If PAID — markPaidAtomically (CAS — survives concurrent callback
+   *    arriving в parallel) → emit PaymentConfirmedEvent
+   * 4. If FAILED либо REFUNDED — log only, leave PENDING для manual
+   *    review (rare, signals gateway-side issue)
+   *
+   * Returns count of reconciled payments — useful для logging/metrics.
+   */
+  async reconcileStalePending(thresholdMinutes = 10): Promise<number> {
+    const stale = await this.paymentRepo.findStalePending(thresholdMinutes);
+    if (stale.length === 0) return 0;
+
+    this.logger.log(`Reconciling ${stale.length} stale PENDING payment(s) (older than ${thresholdMinutes}m)`);
+    let reconciledCount = 0;
+
+    for (const payment of stale) {
+      try {
+        if (!payment.invoiceId) continue;
+
+        const pharmacy = await this.pharmacyRepo.findById(payment.pharmacyId);
+        if (!pharmacy?.hasMulticardCredentials()) {
+          this.logger.warn(
+            `Payment ${payment.getId()}: pharmacy ${payment.pharmacyId} no longer has Multicard creds — skipping reconcile`,
+          );
+          continue;
+        }
+
+        const creds = this.gatewayCredentialsFor(pharmacy);
+        const gatewayStatus = await this.gateway.getInvoiceStatus(creds, payment.invoiceId);
+
+        if (gatewayStatus.status === 'PAID') {
+          // Reconciled: gateway considers paid, mark locally + emit event.
+          // Note: cron-driven reconcile loses cardPan / receiptUrl detail
+          // (those come from callback). Acceptable trade-off; receipt
+          // can be requested manually if needed.
+          const updated = await this.paymentRepo.markPaidAtomically(payment.invoiceId, {
+            transactionId: `reconciled:${payment.invoiceId}`,
+          });
+          if (updated) {
+            this.eventEmitter.emit(
+              'payment.confirmed',
+              new PaymentConfirmedEvent({
+                paymentId: updated.getId(),
+                orderId: updated.orderId,
+                pharmacyId: updated.pharmacyId,
+                amount: updated.amount.amount,
+              }),
+            );
+            reconciledCount++;
+            this.logger.log(`Payment ${updated.getId()} reconciled to PAID (callback was lost)`);
+          }
+        } else if (gatewayStatus.status === 'FAILED' || gatewayStatus.status === 'REFUNDED') {
+          // Don't auto-mark — signals gateway issue либо partial flow.
+          // Leaving PENDING ensures human review.
+          this.logger.warn(
+            `Payment ${payment.getId()}: gateway reports ${gatewayStatus.status} — left PENDING for manual review`,
+          );
+        }
+      } catch (error) {
+        // One payment failing should not block others.
+        this.logger.error(
+          `Reconcile failed for payment ${payment.getId()}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
+
+    if (reconciledCount > 0) {
+      this.logger.log(`Reconciled ${reconciledCount}/${stale.length} payments`);
+    }
+    return reconciledCount;
+  }
 }
