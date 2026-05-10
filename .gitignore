@@ -35,3 +35,6 @@ apps/api/prisma/*.db
 *.d.ts
 !**/vite-env.d.ts
 !jest.config.ts
+
+# Local-only gidstroy reference doc, not for dorify repo
+docs/SPLIT-MODE.md

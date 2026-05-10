@@ -224,4 +224,116 @@ describe('MulticardAdapter — HTTP integration', () => {
       }),
     ).rejects.toThrow('store_id is required');
   });
+
+  describe('retry on transient failures', () => {
+    it('retries 5xx auth response and succeeds on second attempt', async () => {
+      let call = 0;
+      fetchSpy.mockImplementation(async () => {
+        call += 1;
+        if (call === 1) {
+          // First auth attempt — 503 Service Unavailable
+          return {
+            ok: false,
+            status: 503,
+            text: async () => 'temporary outage',
+            json: async () => ({}),
+          } as Response;
+        }
+        if (call === 2) {
+          // Second auth attempt succeeds
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({ token: 'recovered' }),
+            json: async () => ({ token: 'recovered' }),
+          } as Response;
+        }
+        // createInvoice call
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              success: true,
+              data: { uuid: 'u', store_id: 6, amount: 100, invoice_id: 'i', checkout_url: 'https://co' },
+            }),
+          json: async () => ({}),
+        } as Response;
+      });
+
+      const result = await adapter.createInvoice(CREDS, {
+        invoiceId: 'i',
+        amount: 1,
+        description: 'd',
+        callbackUrl: 'https://cb',
+        items: [{ name: 'x', quantity: 1, price: 1, ikpu: '06401004002000000', packageCode: '1506113' }],
+      });
+
+      expect(result.invoiceId).toBe('u');
+      expect(call).toBe(3); // 1 failed auth + 1 retry auth + 1 invoice
+    });
+
+    it('retries on network error (fetch throws) then succeeds', async () => {
+      let call = 0;
+      fetchSpy.mockImplementation(async () => {
+        call += 1;
+        if (call === 1) {
+          throw new TypeError('fetch failed: ECONNRESET');
+        }
+        if (call === 2) {
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({ token: 'recovered' }),
+            json: async () => ({ token: 'recovered' }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              success: true,
+              data: {
+                uuid: 'u',
+                store_id: 6,
+                amount: 500000,
+                invoice_id: 'i',
+                payment: { id: 1, uuid: 'p', status: 'success', total_amount: 500000 },
+              },
+            }),
+          json: async () => ({}),
+        } as Response;
+      });
+
+      const status = await adapter.getInvoiceStatus(CREDS, 'u');
+      expect(status.status).toBe('PAID');
+      expect(call).toBe(3);
+    });
+
+    it('does NOT retry on 4xx (auth invalid creds)', async () => {
+      mockFetch({ ok: false, status: 401, body: 'invalid credentials' });
+
+      await expect(
+        adapter.getInvoiceStatus(CREDS, 'u'),
+      ).rejects.toThrow(/HTTP 401/);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives up after RETRY_MAX_ATTEMPTS (3) and surfaces last error', async () => {
+      mockFetch(
+        { ok: false, status: 503, body: 'always 503' },
+        { ok: false, status: 503, body: 'still 503' },
+        { ok: false, status: 503, body: 'final 503' },
+      );
+
+      await expect(
+        adapter.getInvoiceStatus(CREDS, 'u'),
+      ).rejects.toThrow(/HTTP 503/);
+
+      // 3 attempts на auth (caching не помогает первому invoke)
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+    });
+  });
 });

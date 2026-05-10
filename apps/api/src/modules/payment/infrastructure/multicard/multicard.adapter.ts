@@ -23,6 +23,9 @@ import type {
 const TOKEN_TTL_MS = 23 * 60 * 60 * 1000;
 const TIYIN_PER_SUM = 100;
 
+const RETRY_MAX_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 200;
+
 interface CachedToken {
   token: string;
   expiresAt: number;
@@ -37,6 +40,31 @@ const STATUS_MAP: Record<MulticardPaymentStatus, GatewayInvoiceStatus> = {
   revert: 'REFUNDED',
   hold: 'PENDING',
 };
+
+/**
+ * Transient HTTP error from Multicard — retryable. Captures status code
+ * для retry decision. Non-2xx с 5xx либо 408/429 = retryable; иначе non-retryable.
+ */
+class MulticardHttpError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = 'MulticardHttpError';
+  }
+
+  isRetryable(): boolean {
+    return this.status >= 500 || this.status === 408 || this.status === 429;
+  }
+}
+
+/**
+ * Network-level failure (DNS, connect refused, socket reset). Retryable.
+ */
+class MulticardNetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MulticardNetworkError';
+  }
+}
 
 @Injectable()
 export class MulticardAdapter implements PaymentGatewayPort {
@@ -63,6 +91,10 @@ export class MulticardAdapter implements PaymentGatewayPort {
       ...(params.returnUrl ? { return_url: params.returnUrl } : {}),
     };
 
+    // Multicard uses `invoice_id` as natural idempotency key — re-posting
+    // same invoice_id returns the existing invoice OR a clean error.
+    // Our Payment.invoiceId @unique constraint also prevents local duplicates.
+    // → safe to retry transient failures on createInvoice.
     const response = await this.fetchJson<MulticardResponse<CreateInvoiceResponseData>>(
       'POST',
       '/payment/invoice',
@@ -126,28 +158,74 @@ export class MulticardAdapter implements PaymentGatewayPort {
     return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(provided, 'hex'));
   }
 
+  /**
+   * Retry helper — exponential backoff с jitter. Retries on:
+   * - MulticardHttpError 5xx / 408 / 429
+   * - MulticardNetworkError (fetch threw — DNS, connect refused)
+   *
+   * Не retries:
+   * - HTTP 4xx (auth bad, validation fail) — won't succeed on retry
+   * - JSON parse errors (broken response — retry probably same)
+   * - Business errors (response.success=false) — caller decides
+   */
+  private async withRetry<T>(
+    operation: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= RETRY_MAX_ATTEMPTS; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastError = err;
+        const retryable =
+          (err instanceof MulticardHttpError && err.isRetryable()) ||
+          err instanceof MulticardNetworkError;
+        if (!retryable || attempt === RETRY_MAX_ATTEMPTS) {
+          throw err;
+        }
+        const delayMs = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1) + Math.random() * 100;
+        const reason = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Multicard ${operation} attempt ${attempt}/${RETRY_MAX_ATTEMPTS} failed (${reason}); retrying in ${Math.round(delayMs)}ms`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    throw lastError;
+  }
+
   private async authenticate(credentials: PaymentGatewayCredentials): Promise<string> {
     const cached = this.tokenCache.get(credentials.appId);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.token;
     }
 
-    const response = await fetch(`${this.baseUrl}/auth`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        application_id: credentials.appId,
-        secret: credentials.secret,
-      }),
+    const data = await this.withRetry('auth', async () => {
+      let response: Response;
+      try {
+        response = await fetch(`${this.baseUrl}/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            application_id: credentials.appId,
+            secret: credentials.secret,
+          }),
+        });
+      } catch (err) {
+        throw new MulticardNetworkError(
+          `auth network error: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new MulticardHttpError(response.status, `auth HTTP ${response.status} ${text}`);
+      }
+
+      return (await response.json()) as AuthResponse;
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      this.logger.error(`Multicard auth failed: ${response.status} ${text}`);
-      throw new Error(`Multicard auth failed: HTTP ${response.status}`);
-    }
-
-    const data = (await response.json()) as AuthResponse;
     if (!data.token) {
       throw new Error('Multicard auth response missing token');
     }
@@ -166,29 +244,38 @@ export class MulticardAdapter implements PaymentGatewayPort {
     token: string,
     body?: unknown,
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    return this.withRetry(`${method} ${path}`, async () => {
+      let response: Response;
+      try {
+        response = await fetch(`${this.baseUrl}${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+          },
+          ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        });
+      } catch (err) {
+        throw new MulticardNetworkError(
+          `${method} ${path} network error: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+
+      const text = await response.text();
+
+      if (!response.ok) {
+        // 5xx / 408 / 429 — retryable; 4xx — not (will throw без retry).
+        throw new MulticardHttpError(response.status, `${method} ${path} HTTP ${response.status} ${text}`);
+      }
+
+      try {
+        return text ? (JSON.parse(text) as T) : ({} as T);
+      } catch {
+        // JSON parse failure — non-retryable (server returned malformed
+        // response which won't fix on retry).
+        throw new Error(`Multicard ${method} ${path}: non-JSON response (HTTP ${response.status})`);
+      }
     });
-
-    const text = await response.text();
-    let parsed: T;
-    try {
-      parsed = text ? (JSON.parse(text) as T) : ({} as T);
-    } catch {
-      throw new Error(`Multicard ${method} ${path}: non-JSON response (HTTP ${response.status})`);
-    }
-
-    if (!response.ok) {
-      this.logger.error(`Multicard ${method} ${path}: HTTP ${response.status} ${text}`);
-      throw new Error(`Multicard ${method} ${path}: HTTP ${response.status}`);
-    }
-
-    return parsed;
   }
 
   private sumToTiyin(amountInSum: number): number {
