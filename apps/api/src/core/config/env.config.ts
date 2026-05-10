@@ -41,6 +41,13 @@ const EnvSchema = z.object({
   STORAGE_PATH: z.string().default('/opt/dorify-v2/uploads'),
   STORAGE_BASE_URL: z.string().url().default('https://api.dorify.uz/uploads'),
   STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
+  // Telegram chat IDs для admin DM notifications (pharmacy approvals).
+  // Comma-separated numeric IDs. Mirror of bot's ADMIN_CHAT_IDS — backend
+  // sends DMs directly via Telegram Bot API; bot handles approval callbacks.
+  ADMIN_CHAT_IDS: z
+    .string()
+    .default('')
+    .transform((val) => val.split(',').map((s) => s.trim()).filter(Boolean).map(Number)),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
