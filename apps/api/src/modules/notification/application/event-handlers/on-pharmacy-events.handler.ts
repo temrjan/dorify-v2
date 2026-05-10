@@ -59,7 +59,7 @@ export class PharmacyNotificationHandler {
     this.logger.log(`Notified ${admins.length} admin(s) about pharmacy ${pharmacyId}`);
   }
 
-  /** Pharmacy approved — DM owner. */
+  /** Pharmacy approved — DM owner с web_app button (initData injected). */
   @OnEvent('pharmacy.verified')
   async onPharmacyVerified(event: PharmacyVerifiedEvent): Promise<void> {
     const owner = await this.userRepo.findById(event.payload.ownerId);
@@ -68,8 +68,17 @@ export class PharmacyNotificationHandler {
     await this.notifier.sendMessage(
       owner.telegramId.toString(),
       `✅ <b>Аптека одобрена</b>\n\n` +
-        `<b>${event.payload.name}</b> прошла модерацию.\n\n` +
-        `Открыть панель: ${config.WEB_URL}/pharmacy`,
+        `<b>${event.payload.name}</b> прошла модерацию. Откройте панель чтобы добавить товары.`,
+      {
+        inlineKeyboard: [
+          [
+            {
+              text: '🏪 Открыть панель аптеки',
+              web_app: { url: `${config.WEB_URL.replace(/\/+$/, '')}/pharmacy` },
+            },
+          ],
+        ],
+      },
     );
   }
 
