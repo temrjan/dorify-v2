@@ -68,6 +68,29 @@ export class OrderingService {
       ? OrderStatus.PENDING
       : OrderStatus.PENDING_MANUAL_CONTACT;
 
+    // 2.5 OFD validation (Phase 4 closure). Multicard invoice creation
+    //     requires IKPU + package_code per item — без них API rejects
+    //     с error_fields. Raise here instead of letting Multicard fail
+    //     post-order-create (current code creates orphan order with
+    //     failing payment). Skipped для PENDING_MANUAL_CONTACT — manual
+    //     orders не идут через Multicard, OFD не обязателен.
+    if (pharmacy.hasMulticardCredentials()) {
+      const missingOfd: string[] = [];
+      for (const item of dto.items) {
+        const product = products.find((p) => p.getId() === item.productId);
+        if (!product) continue;
+        if (!product.ikpu || !product.packageCode) {
+          missingOfd.push(product.name);
+        }
+      }
+      if (missingOfd.length > 0) {
+        throw new ForbiddenException(
+          `Товары ${missingOfd.join(', ')} не имеют ИКПУ либо кода упаковки — ` +
+            `Multicard не сможет выписать invoice. Обратитесь к аптеке для дозаполнения OFD-данных.`,
+        );
+      }
+    }
+
     // 3. Create Order (Aggregate Root)
     const order = Order.create({
       id: generateId(),
