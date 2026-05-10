@@ -20,7 +20,8 @@ export function Layout({ children }: { children: ReactNode }) {
     location.pathname.startsWith('/checkout') ||
     location.pathname.startsWith('/product/') ||
     location.pathname.startsWith('/pharmacy') ||
-    location.pathname.startsWith('/payment');
+    location.pathname.startsWith('/payment') ||
+    location.pathname.startsWith('/become-pharmacy');
 
   return (
     <div className={hideTabbar ? '' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]'}>
