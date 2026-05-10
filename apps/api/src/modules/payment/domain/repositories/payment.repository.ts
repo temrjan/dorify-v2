@@ -15,6 +15,12 @@ export interface PaymentRepository {
     cardPan?: string;
     receiptUrl?: string;
   }): Promise<Payment | undefined>;
+  /**
+   * Returns payments stuck в PENDING longer than `thresholdMinutes` —
+   * candidates для reconciliation cron (callback dropped, network blip).
+   * Filters к Multicard provider only (others reconciled separately).
+   */
+  findStalePending(thresholdMinutes: number): Promise<Payment[]>;
 }
 
 export const PAYMENT_REPOSITORY = Symbol('PAYMENT_REPOSITORY');

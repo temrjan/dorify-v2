@@ -44,6 +44,21 @@ export class PrismaPaymentRepository implements PaymentRepository {
     });
   }
 
+  async findStalePending(thresholdMinutes: number): Promise<Payment[]> {
+    const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+    const records = await this.prisma.payment.findMany({
+      where: {
+        status: 'PENDING',
+        provider: 'MULTICARD',
+        createdAt: { lt: cutoff },
+        invoiceId: { not: null },
+      },
+      take: 50, // safety bound — process up to 50 per cron tick
+      orderBy: { createdAt: 'asc' },
+    });
+    return records.map(PaymentMapper.toDomain);
+  }
+
   /**
    * Race-condition-safe: atomically find PENDING payment and mark as PAID.
    * Uses WHERE status = 'PENDING' inside transaction to prevent double-processing.
