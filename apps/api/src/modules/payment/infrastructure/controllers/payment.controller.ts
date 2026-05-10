@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { Public } from '@common/decorators/public.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '@common/pipes/zod-validation.pipe';
 import { PaymentService } from '../../application/payment.service';
+import { MulticardCallbackIpGuard } from '../guards/multicard-callback-ip.guard';
 import { CreatePaymentSchema, MulticardCallbackSchema } from '../../application/dto/payment.dto';
 import type { CreatePaymentDto, MulticardCallbackDto } from '../../application/dto/payment.dto';
 
@@ -21,6 +22,7 @@ export class PaymentController {
 
   @Post('callback')
   @Public()
+  @UseGuards(MulticardCallbackIpGuard)
   @HttpCode(HttpStatus.OK)
   async processCallback(
     @Body(new ZodValidationPipe(MulticardCallbackSchema)) dto: MulticardCallbackDto,

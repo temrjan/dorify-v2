@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DeliveryType } from '@prisma/client';
 import { PrismaService } from '@core/database/prisma.service';
+import { InsufficientStockError } from '../../domain/repositories/order.repository';
 import type { OrderRepository } from '../../domain/repositories/order.repository';
 import type { Order } from '../../domain/entities/order.entity';
 import type { PaginatedResult, PaginationDto } from '@common/dto/pagination.dto';
@@ -85,6 +86,41 @@ export class PrismaOrderRepository implements OrderRepository {
           deliveryAddress: data.deliveryAddress,
           contactPhone: data.contactPhone,
           comment: data.comment,
+        },
+      });
+    });
+  }
+
+  async placeAtomically(order: Order): Promise<void> {
+    const data = OrderMapper.toPersistence(order);
+    const itemsData = order.items.map((item) =>
+      OrderMapper.itemToPersistence(item, order.getId()),
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      // Atomic conditional decrement per item — Postgres row-level lock
+      // via UPDATE WHERE prevents lost-update (audit S-HIGH-4). If stock
+      // < quantity либо product missing → updateMany returns count=0 →
+      // throw to roll back entire transaction.
+      for (const item of order.items) {
+        const result = await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            stock: { gte: item.quantity },
+            deletedAt: null,
+          },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (result.count === 0) {
+          throw new InsufficientStockError(item.productId);
+        }
+      }
+
+      await tx.order.create({
+        data: {
+          ...data,
+          deliveryType: data.deliveryType as DeliveryType,
+          items: { create: itemsData.map(({ orderId: _, ...item }) => item) },
         },
       });
     });
