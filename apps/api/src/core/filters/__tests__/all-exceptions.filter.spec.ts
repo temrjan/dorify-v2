@@ -1,4 +1,4 @@
-import { HttpStatus, BadRequestException } from '@nestjs/common';
+import { HttpStatus, BadRequestException, Logger } from '@nestjs/common';
 import type { ArgumentsHost } from '@nestjs/common';
 import { AllExceptionsFilter } from '../all-exceptions.filter';
 import { DomainError } from '@shared/domain';
@@ -9,7 +9,10 @@ interface CapturedResponse {
   errors: unknown;
 }
 
-function makeHost(): { host: ArgumentsHost; captured: CapturedResponse } {
+function makeHost(headers: Record<string, string> = {}): {
+  host: ArgumentsHost;
+  captured: CapturedResponse;
+} {
   const captured: CapturedResponse = { statusCode: 0, message: '', errors: undefined };
   const response = {
     status(code: number) {
@@ -22,7 +25,7 @@ function makeHost(): { host: ArgumentsHost; captured: CapturedResponse } {
       return this;
     },
   };
-  const request = { method: 'POST', url: '/test' };
+  const request = { method: 'POST', url: '/test', headers };
   const host = {
     switchToHttp: () => ({
       getResponse: () => response,
@@ -54,5 +57,28 @@ describe('AllExceptionsFilter', () => {
     filter.catch(new Error('boom'), host);
     expect(captured.statusCode).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(captured.message).toBe('Internal server error');
+  });
+
+  it('scrubs sensitive headers in log output (audit P4.1)', () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const { host } = makeHost({
+      authorization: 'Bearer secret-token',
+      cookie: 'session=abc',
+      'x-telegram-initdata': 'user=1',
+      'x-service-token': 'service-secret',
+      'x-api-key': 'api-secret',
+      'user-agent': 'jest-test',
+    });
+    filter.catch(new BadRequestException('test'), host);
+
+    const logged = warnSpy.mock.calls[0]?.[0] as string;
+    expect(logged).toContain('user-agent');
+    expect(logged).not.toContain('Bearer secret-token');
+    expect(logged).not.toContain('session=abc');
+    expect(logged).not.toContain('user=1');
+    expect(logged).not.toContain('service-secret');
+    expect(logged).not.toContain('api-secret');
+    expect(logged).toContain('[REDACTED]');
+    warnSpy.mockRestore();
   });
 });
