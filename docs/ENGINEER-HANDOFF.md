@@ -15,9 +15,9 @@
 - Session 3 Day 1-2 (2026-05-09, 11 PR #12–#22): полный design pass v2.
 - Session 3 Day 3 (2026-05-09, 2 PR #24–#25): закрытие 3 оставшихся ⏳ из POLISH_PLAN.
 - Session 4 (2026-05-09, 6 PR #27–#32): pharmacy onboarding spec adapt + CI hardening + Sprint 0 PR-1/PR-2 + audit Phase 1 quick wins.
-- **Session 5 (2026-05-10, 11 PR #34–#44):** Sprint 0 PR-3 closeout, full Sprint 1 Days 1-6 (bot welcome + wizard + admin DM + per-pharmacy cart + onboarding), audit deep batch 1 (Order race + Callback IP whitelist), Phase 4 (OFD validation + ReconcilePayments cron), 2 smoke fixes (#43 slug auto-derive, #44 verify DM web_app button), handoff docs.
-**Production live:** v2 frontend готов, pharmacy onboarding **e2e verified in production** (bot welcome → wizard → admin DM → approval → owner получает Mini App с initData → onboarding checklist). 4 из 5 smoke blocks ✅, **Block 5 (buyer cart) pending**. Backend hardened: audit Phase 1 + 2 critical/high deep closed; Phase 4 на 6/7.
-**Next session entry point:** Block 5 smoke (buyer cart с Multicard и manual contact для test pharmacy). Затем audit batch 2 (Idempotency-Key + Refresh tokens, нужен Redis client) либо Phase 4 final piece (Multicard adapter retry).
+- **Session 5 (2026-05-10, 13 PR #34–#46):** Sprint 0 PR-3 closeout, full Sprint 1 Days 1-6, audit deep batch 1, Phase 4 hardening **closed 7/7** (OFD validation + ReconcilePayments cron + IP whitelist + **Multicard adapter retry**), 2 smoke fixes (#43 slug auto-derive, #44 verify DM web_app button), handoff docs.
+**Production live:** pharmacy onboarding **e2e verified в production** (bot welcome → wizard → admin DM → approval → owner Mini App с initData → onboarding checklist + logo через Caddy). **Phase 4 closed 7/7.** Audit critical+high closed **9/12** (Phase 1 quick wins + deep batch 1). Smoke **4/5 blocks pass**; **Block 5 (buyer flow — manual contact / Multicard) pending**.
+**Next session entry point:** Block 5 smoke (~15 мин). Затем audit batch 2 (Idempotency-Key для placeOrder + Refresh tokens — нужен Redis client) либо Tier 2/3 (admin SPA, pharmacy orders list).
 
 ---
 
@@ -60,6 +60,69 @@
 
 ---
 
+## Solo split-mode workflow — skills + перепроверка
+
+Engineer работает соло (no separate Reviewer agent), но имитирует двойную проверку через skills. Per Captain calibration 2026-05-10 — после Session 5 «много шипанули без review» — этот pipeline становится default для **non-trivial PR**.
+
+### 12-step pipeline
+
+| # | Шаг | Skill | Когда обязательно |
+|---|---|---|---|
+| 1 | INTAKE — read state.json + git status + relevant files (Tier 1 cite) | — | always |
+| 2 | Plan body — files / scope / not-in-scope / acceptance gates / risks / open Q | — | always для non-trivial |
+| 3 | **`/selfcheck`** — критика своего же plan (4 категории: correctness / completeness / efficiency / practicality, ≥3 findings/cat) | `/selfcheck` | если ≥100 LOC либо security/payment vector |
+| 4 | **`/check`** — adversarial review плана (≥5 findings, banned weasel words) | `/check` | если ≥100 LOC |
+| 5 | Captain approve word — explicit «давай» / «одобрено» / «go» | — | Iron Law #4 |
+| 6 | Coding с Tier 1 probes (read existing patterns ДО написания) | `/codex` + `/typescript` | always pre-code |
+| 7 | **`/typescript-review`** — pre-commit code review (4 категории: correctness / performance / security / readability) | `/typescript-review` | always для TS PR |
+| 8 | **`/security-review`** — auth / payment / upload / secrets / public endpoints | `/security-review` | mandatory если затронут security vector |
+| 9 | Branch + commit + push (explicit `git add path1 path2`, **не** `-A`) | — | Iron Law #6 |
+| 10 | PR + CI green gate | — | Iron Law #5 |
+| 11 | Captain merge approve («мердж готов» либо явное) | — | Iron Law #6 |
+| 12 | **`/verify`** — post-deploy Tier 1 (curl health + endpoint + DB state если migration) | `/verify` | always после merge to main |
+
+### Когда можно срезать
+
+**Micro-chores** (≤10 LOC, no logic, no security vector):
+- Skip /selfcheck + /check
+- Apply /codex + /typescript-review still
+- Captain explicit override needed: «начинай реализацию» либо «без ревьюера»
+
+**Doc-only PRs:**
+- Skip /selfcheck + /check + /typescript-review
+- Apply /verify if affects deployment либо CI
+
+### Anti-patterns
+
+- ❌ `git add -A` либо `git add .` → подхватит .env / temp / Captain's local files. Always explicit paths.
+- ❌ Skip `/security-review` потому что «sure all OK» — security findings catch what mental review misses.
+- ❌ Multiple PRs в close-succession без verify intermediate state — Session 4 incident #9 (orphan containers race).
+- ❌ Force push without Captain approval — Iron Law #6.
+- ❌ `restart` для env reload — нужен `up -d --force-recreate` (env_file changes ignored on restart).
+
+### Skills таблица
+
+| Skill | Что делает | Mandatory для |
+|---|---|---|
+| `/codex` | Loads architecture / nestjs / typescript standards | Любой coding session start |
+| `/typescript` | TS-specific CORE.md (interfaces / types / discriminated unions) | Pre-code на TS |
+| `/selfcheck` | Self-criticism своего plan / decision | Non-trivial либо surprise approach |
+| `/check` | Adversarial plan review с ≥5 findings | Non-trivial PR (≥100 LOC) |
+| `/typescript-review` | Pre-commit code review для TS | Любой TS code PR |
+| `/security-review` | OWASP-style review | Auth / payment / upload / secrets / public endpoint |
+| `/review` | Cross-cutting bundle | Multi-language либо multi-module diff (200+ LOC) |
+| `/verify` | Post-deploy smoke check | После merge to main |
+
+### Honest self-review про Session 5
+
+Я (Engineer) в Session 5 **shipped 13 PR без следования полному split-mode** — большинство fixes малые либо continuations, но 4 крупных (#36 wizard 1037 LOC, #38 cart Pattern A 653 LOC, #39 audit batch 1 180 LOC, #41 cron 180 LOC) **должны были иметь /check + /security-review**. Я полагался на mental checklist что ловит ~80% issues но не 100%.
+
+**Block 5 smoke pending** — это пример риска: 4 PRs не пройдены через formal /security-review, и smoke test уже found 2 bugs (#43 slug auto-derive React state, #44 plain URL DM не injecting initData). Real production behavior НЕ был verified до того момента.
+
+**Lesson для следующей сессии:** non-trivial PR обязан проходить через **минимум /codex + /typescript-review + /security-review (если security vector)**. /selfcheck + /check рекомендуются но не блокируют merge для коротких decisions.
+
+---
+
 ## Project state — phases (per `docs/DORIFY_V2_DDD.md` §10)
 
 | Фаза | Что | Статус (2026-05-09) | Что осталось |
@@ -68,11 +131,11 @@
 | 1 | IAM Module | ✅ ~99% | Admin creds в env ✓; ServiceTokenGuard ✓; admin verify/reject endpoints ✓ (PR #29); GET /pharmacy/:id public ✓ (PR #38); JwtAuthGuard wire — dead code (Phase 8) |
 | 2 | Catalog Module | ✅ ~98% | `getMyProduct` endpoint ✓; status filter в DTO ✓; **master categories list** ✓ (PR #22) |
 | 3 | Ordering Module | ✅ ~95% | Per-pharmacy cart с PENDING_MANUAL_CONTACT ✓ (PR #38); placeAtomically с row-level lock ✓ (PR #39 — fixed audit S-HIGH-4); OFD validation order-time ✓ (PR #40); admin order controller — TODO Tier 2/3 |
-| 4 | Payment Module | ✅ ~95% | Frontend ✓; AES encryption ✓; MD5 sig ✓; CallbackIpGuard ✓ (PR #39 — audit S-CRIT-4); OFD validation ✓ (PR #40); ReconcilePayments cron ✓ (PR #41). **Остаётся:** Idempotency-Key + retry в Multicard adapter (audit batch 2 либо Phase 4 final) |
+| 4 | Payment Module | ✅ ~99% (7/7) | Frontend ✓; AES encryption ✓; MD5 sig ✓; CallbackIpGuard ✓ (PR #39); OFD validation ✓ (PR #40); ReconcilePayments cron ✓ (PR #41); **Multicard adapter retry ✓** (PR #46 — exp backoff + jitter). Phase 4 **closed.** Backlog: Idempotency-Key для placeOrder (Redis) — отдельный audit S-HIGH-3 |
 | 5 | Frontend | ✅ ~95% | Design pass v2 ✓; `/become-pharmacy` wizard ✓ (PR #36); per-pharmacy cart Pattern A ✓ (PR #38); `/inquiry/:pharmacyId` ✓ (PR #38); `/pharmacy/onboarding` checklist ✓ (PR #38); CheckoutPage simplified ✓ (PR #38). **Остаётся:** pharmacy orders list (Tier 2), pharmacy payment-settings UI, Admin SPA, i18n switcher (Day 7 backlog) |
 | 6 | Bot + Notifications | ✅ ~90% | Welcome flow с UZ/RU + role choice ✓ (PR #35); admin DM approval ✓ (PR #37); per-pharmacy DM на manual contact orders ✓ (PR #38); ReconcilePayments cron emits events → bot DMs ✓ (PR #41) |
 | 7 | Search (Avi) | ⚠️ ~30% | Qdrant→pgvector переход (Captain decision), Product события chain, frontend AI search UI |
-| 8 | Audit + Security + Migrate | ⚠️ ~55% | Audit Phase 1 quick wins ✓ (PR #31); CI concurrency ✓ (PR #28); audit deep batch 1 ✓ (PR #39: Order race + Callback IP). **TODO:** миграция v1→v2, AuditInterceptor, rate limiting, **Idempotency-Key для placeOrder (Redis)**, **Refresh tokens (Redis)**, входной sanitization beyond Zod |
+| 8 | Audit + Security + Migrate | ⚠️ ~60% | Audit Phase 1 quick wins ✓ (PR #31); CI concurrency ✓ (PR #28); audit deep batch 1 ✓ (PR #39); 9/12 critical+high closed (см. `docs/AUDIT_REPORT.md`). **TODO:** Idempotency-Key для placeOrder (Redis); Refresh tokens (Redis); UserRole в domain layer (architectural ~1h); TenantContext port (~2h); миграция v1→v2; AuditInterceptor; rate limiting; input sanitization beyond Zod |
 
 **Roadmap до cutover:** ~7-10 рабочих дней (Phase 4 closure + admin SPA + bot wizard + migration). Frontend design в основном завершён.
 

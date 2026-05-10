@@ -1,13 +1,27 @@
 ---
 type: feature-spec
-status: draft
+status: completed
 created: 2026-05-09
+updated: 2026-05-10
 author: Engineer (Session 3 Day 3)
 version: 1.1
 based-on: gidstroy/docs/vendor-onboarding-spec.md (адаптировано под dorify-v2 stack)
 ---
 
 # Pharmacy Onboarding — спецификация и план реализации
+
+> **STATUS: ✅ DONE (Session 5, 2026-05-10).** Sprint 0 + Sprint 1 Days 1-6 shipped в production.
+> Документ остаётся как исторический reference что было реализовано. Implementation:
+> - PR #29 (Sprint 0 PR-1): admin endpoints + ServiceTokenGuard
+> - PR #32 (Sprint 0 PR-2): image upload module
+> - PR #34 (Sprint 0 PR-3): deps + logs scrub
+> - PR #35 (Day 1): bot welcome flow с UZ/RU
+> - PR #36 (Days 2-4): become-pharmacy wizard 4 шага
+> - PR #37 (Day 5): admin DM approval flow
+> - PR #38 (Day 6): per-pharmacy cart Pattern A + InquiryPage + onboarding checklist
+> - PR #43, #44: smoke fixes (slug auto-derive, verify DM web_app button)
+>
+> **Production-verified** через Captain smoke test 4/5 blocks. Block 5 (buyer flow) — pending для следующей сессии.
 
 ## TL;DR
 
