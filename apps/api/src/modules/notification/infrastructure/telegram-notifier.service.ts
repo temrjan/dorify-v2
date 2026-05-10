@@ -1,9 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { config } from '@core/config/env.config';
 
+/**
+ * Inline keyboard button. Один из {callback_data, web_app, url} обязателен.
+ * - `callback_data` → bot callback_query handler
+ * - `web_app` → opens Mini App с Telegram initData injected (auth работает)
+ * - `url` → opens link в external browser БЕЗ initData
+ */
 export interface InlineButton {
   text: string;
-  callback_data: string;
+  callback_data?: string;
+  web_app?: { url: string };
+  url?: string;
 }
 
 export interface SendMessageOptions {
