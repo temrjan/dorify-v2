@@ -1,7 +1,7 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-09** (Session 4 — pharmacy onboarding spec + Sprint 0 + audit Phase 1).
+> Updated: **2026-05-10** (Session 5 — Sprint 1 closeout + Phase 4 hardening + audit deep batch 1).
 
 ---
 
@@ -14,9 +14,10 @@
 - Session 2 (2026-05-08, 6 PR #5–#10): payment frontend flow, pharmacy CRUD, CI/bot/CORS fixes.
 - Session 3 Day 1-2 (2026-05-09, 11 PR #12–#22): полный design pass v2.
 - Session 3 Day 3 (2026-05-09, 2 PR #24–#25): закрытие 3 оставшихся ⏳ из POLISH_PLAN.
-- **Session 4 (2026-05-09, 6 PR #27–#32):** pharmacy onboarding spec adapt + CI hardening + Sprint 0 PR-1 (admin endpoints + ServiceTokenGuard) + audit save/fix + Sprint 0 PR-2 (image upload module). Sprint 0 на 90% (PR-2 awaiting merge, PR-3 next).
-**Production live:** v2 frontend визуально готов на 100%. Backend hardening — **audit Phase 1 complete** (hardcoded creds removed, Math.random → crypto.randomUUID, DomainError → 400, InitData TTL 5 min, getCurrentUser fixed). CI deploy serialized (concurrency group). Image upload infrastructure готова (на сервере volume + Caddy config pending).
-**Next session:** Sprint 0 PR-3 (deps + logs scrub) → Sprint 1 (5-6 days: bot welcome flow + 4-step wizard + admin DM approval + per-pharmacy cart + onboarding checklist).
+- Session 4 (2026-05-09, 6 PR #27–#32): pharmacy onboarding spec adapt + CI hardening + Sprint 0 PR-1/PR-2 + audit Phase 1 quick wins.
+- **Session 5 (2026-05-10, 7 PR #34–#41):** Sprint 0 PR-3 closeout, full Sprint 1 (bot welcome + wizard + admin DM + per-pharmacy cart + onboarding), audit deep batch 1 (Order race + Callback IP whitelist), Phase 4 progress (OFD validation + ReconcilePayments cron). **Каждый день sprint'а отдельный PR за 1 sitting.**
+**Production live:** v2 frontend визуально готов 100%, **pharmacy onboarding e2e работает** (bot → wizard → admin DM → onboarding checklist), buyer cart с per-pharmacy Pattern A + manual contact fallback. Backend hardened: audit Phase 1 + 2 critical/high deep findings closed. Phase 4 на 6/7 (only Multicard adapter retry/idempotency remaining).
+**Next session:** Production e2e smoke testing first (untested cumulative behavior from 7 PRs), then audit batch 2 (Idempotency-Key + Refresh tokens, both требуют Redis client) либо Multicard adapter retry/idempotency.
 
 ---
 
@@ -64,14 +65,14 @@
 | Фаза | Что | Статус (2026-05-09) | Что осталось |
 |---|---|---|---|
 | 0 | Foundation (repo, pnpm, NestJS, Prisma, CI/CD) | ✅ 100% | — |
-| 1 | IAM Module | ✅ ~98% | Admin creds в env ✓ (Session 4 audit fix); ServiceTokenGuard ✓ (Sprint 0 PR-1); JwtAuthGuard wire (dead code, Phase 8) |
+| 1 | IAM Module | ✅ ~99% | Admin creds в env ✓; ServiceTokenGuard ✓; admin verify/reject endpoints ✓ (PR #29); GET /pharmacy/:id public ✓ (PR #38); JwtAuthGuard wire — dead code (Phase 8) |
 | 2 | Catalog Module | ✅ ~98% | `getMyProduct` endpoint ✓; status filter в DTO ✓; **master categories list** ✓ (PR #22) |
-| 3 | Ordering Module | ⚠️ ~90% | Admin order controller отсутствует |
-| 4 | Payment Module | ⚠️ ~85% | Frontend payment flow ✓; WEB_URL env ✓. **Остаются:** OFD order-time validation, ReconcilePayments cron, CallbackIpGuard, Idempotency-Key + retry в adapter (см. `docs/multicard-1/README.md` §8) |
-| 5 | Frontend | ✅ ~85% | **Design pass v2 done** (Sessions 3): HomePage / SearchPage→CatalogPage / Cart / Pharmacy panel / Profile. Theme toggle с persistent override. `/payment/result` polling ✓. **Остаются:** Checkout polish (sticky bar OK), PaymentResult states polish, OrdersPage redesign, pharmacy orders list, pharmacy payment-settings UI, Admin SPA |
-| 6 | Bot + Notifications | ⚠️ ~50% | WEBAPP_URL default fix ✓; pharmacy registration wizard — Sprint 1 (spec ready: docs/PHARMACY_ONBOARDING_SPEC.md) |
+| 3 | Ordering Module | ✅ ~95% | Per-pharmacy cart с PENDING_MANUAL_CONTACT ✓ (PR #38); placeAtomically с row-level lock ✓ (PR #39 — fixed audit S-HIGH-4); OFD validation order-time ✓ (PR #40); admin order controller — TODO Tier 2/3 |
+| 4 | Payment Module | ✅ ~95% | Frontend ✓; AES encryption ✓; MD5 sig ✓; CallbackIpGuard ✓ (PR #39 — audit S-CRIT-4); OFD validation ✓ (PR #40); ReconcilePayments cron ✓ (PR #41). **Остаётся:** Idempotency-Key + retry в Multicard adapter (audit batch 2 либо Phase 4 final) |
+| 5 | Frontend | ✅ ~95% | Design pass v2 ✓; `/become-pharmacy` wizard ✓ (PR #36); per-pharmacy cart Pattern A ✓ (PR #38); `/inquiry/:pharmacyId` ✓ (PR #38); `/pharmacy/onboarding` checklist ✓ (PR #38); CheckoutPage simplified ✓ (PR #38). **Остаётся:** pharmacy orders list (Tier 2), pharmacy payment-settings UI, Admin SPA, i18n switcher (Day 7 backlog) |
+| 6 | Bot + Notifications | ✅ ~90% | Welcome flow с UZ/RU + role choice ✓ (PR #35); admin DM approval ✓ (PR #37); per-pharmacy DM на manual contact orders ✓ (PR #38); ReconcilePayments cron emits events → bot DMs ✓ (PR #41) |
 | 7 | Search (Avi) | ⚠️ ~30% | Qdrant→pgvector переход (Captain decision), Product события chain, frontend AI search UI |
-| 8 | Audit + Security + Migrate | ⚠️ ~40% | AES encryption ✓; CI resilient deploy ✓; CORS prod-default ✓; seed ✓; CI concurrency group ✓ (PR #28); **audit Phase 1 closed** ✓ (PR #31): hardcoded creds removed, Math.random→crypto.randomUUID, DomainError→400, TTL 5 min, getCurrentUser fixed. **TODO:** миграция v1→v2, AuditInterceptor, rate limiting, idempotency keys, refresh tokens, payment race transaction |
+| 8 | Audit + Security + Migrate | ⚠️ ~55% | Audit Phase 1 quick wins ✓ (PR #31); CI concurrency ✓ (PR #28); audit deep batch 1 ✓ (PR #39: Order race + Callback IP). **TODO:** миграция v1→v2, AuditInterceptor, rate limiting, **Idempotency-Key для placeOrder (Redis)**, **Refresh tokens (Redis)**, входной sanitization beyond Zod |
 
 **Roadmap до cutover:** ~7-10 рабочих дней (Phase 4 closure + admin SPA + bot wizard + migration). Frontend design в основном завершён.
 
@@ -116,7 +117,68 @@
 | #29 | `feat(api): pharmacy admin endpoints + check-slug + ServiceTokenGuard` (Sprint 0 PR-1) | +305/-4 LOC |
 | #30 | `docs: save Claude Code audit report` | +521 LOC docs |
 | #31 | `fix(api): audit Phase 1 quick wins` (5 critical/high closed: hardcoded creds, Math.random, DomainError 500→400, InitData TTL 86400→300, getCurrentUser broken) | +143/-48 LOC |
-| #32 | `feat(api): image upload module — StoragePort + local disk adapter` (Sprint 0 PR-2, sharp + magic bytes + path traversal hardening) | +713 LOC, **awaiting merge** |
+| #32 | `feat(api): image upload module — StoragePort + local disk adapter` (Sprint 0 PR-2, sharp + magic bytes + path traversal hardening) | +713 LOC |
+
+## Что отгружено в Session 5 (2026-05-10) — Sprint 1 + Phase 4 hardening
+
+| PR | Содержание | Размер |
+|---|---|---|
+| #34 | `chore: Sprint 0 PR-3 — deps + logs scrub` (@grammyjs/conversations + slugify + react-i18next + sensitive headers redacted) | +166/-7 |
+| #35 | `feat(bot): welcome flow + role choice (Sprint 1 Day 1)` (UZ/RU language picker, Buyer/Register choice, WebApp deep links) | +255/-68 |
+| #36 | `feat(web): become-pharmacy wizard 4 steps (Day 2-4)` (slug live-check, logo upload via PR #32, multi-call orchestration) | +1037/-1 |
+| #37 | `feat: admin DM approval flow (Day 5)` (PharmacyNotificationHandler + bot admin Composer, X-Service-Token wired) | +276/-8 |
+| #38 | `feat: per-pharmacy cart Pattern A + manual contact + onboarding (Day 6)` (CartPage rewrite, CheckoutPage simplified, NEW InquiryPage + PharmacyOnboardingPage, Order PENDING_MANUAL_CONTACT, GET /pharmacy/:id) | +653/-131 |
+| #39 | `fix(api): audit deep batch 1 — Order race transaction + Multicard callback IP whitelist` (placeAtomically с row-level lock, MulticardCallbackIpGuard, trust proxy) | +180/-24 |
+| #40 | `fix(api): OFD order-time validation` (Phase 4 closure — reject orders missing IKPU/packageCode когда pharmacy has Multicard) | +23 |
+| #41 | `feat(api): ReconcilePayments cron` (Phase 4 closure — @nestjs/schedule, 5min cron over PENDING > 10min, gateway query + atomic mark-paid) | +180 |
+
+### Хроника Session 5
+
+1. **Sprint 0 PR-3 закрыт** (#34, ~30 мин) — deps install + sensitive headers scrub в exception filter (audit P4.1). Подготовка к Sprint 1.
+
+2. **Sprint 1 Day 1** (#35, ~1ч) — bot welcome flow с UZ/RU language picker + role choice [Buyer / Register pharmacy]. Простой TS-объект i18n без react-i18next overhead на bot side. Session middleware (in-memory) для lang persistence.
+
+3. **Sprint 1 Day 2-4** (#36, 3 дня compressed в один sitting) — become-pharmacy wizard 4 шага. Multi-call orchestration: register → updateProfile → updatePaymentSettings (partial-state warnings вместо atomic transaction). Logo upload через PR #32 endpoint. Slug live-check с slugify lib. Skipped: i18n setup (Day 7 backlog), type selector (API extension scope creep).
+
+4. **Sprint 1 Day 5** (#37, ~1ч) — admin DM approval. **Architecture decision: Option C** — backend → Telegram Bot API напрямую (uses BOT_TOKEN env). Bot обрабатывает callback_query через polling. PharmacyCreated/Verified/Rejected events emit handlers. Admin chat_id whitelist guard на bot side (defense-in-depth). Reject reason via session pendingRejectId + on('message:text') (no conversations plugin).
+
+5. **Sprint 1 Day 6** (#38, ~2ч) — per-pharmacy cart Pattern A. CartPage rewrite: each pharmacy → собственный block с CTA `[💳 Оплатить]` либо `[💬 Отправить заявку]` based on hasPaymentSettings. CheckoutPage simplified — `?pharmacyId=` only. NEW InquiryPage `/inquiry/:pharmacyId` для manual contact orders. NEW PharmacyOnboardingPage `/pharmacy/onboarding` с 3-step checklist. Backend: Order.create принимает initialStatus, OrderingService определяет PENDING vs PENDING_MANUAL_CONTACT по pharmacy.hasMulticardCredentials, OrderCreatedEvent extended с status + contactPhone, OrderNotificationHandler branched messages. New endpoint GET /pharmacy/:id (public).
+
+6. **Audit deep batch 1** (#39, ~1ч) — closes 2 audit findings:
+   - **S-HIGH-4 Order race:** placeAtomically wraps decrement+create в Postgres tx с atomic conditional UPDATE WHERE stock >= qty (row-level lock, no FOR UPDATE needed). InsufficientStockError → tx rollback. OnOrderCreatedDecrementStock handler теперь noop logger.
+   - **S-CRIT-4 Callback IP whitelist:** MulticardCallbackIpGuard validates request.ip против MULTICARD_CALLBACK_IPS (default 195.158.26.90). app.set('trust proxy', 1) для X-Forwarded-For через Caddy. IPv6-mapped IPv4 normalized.
+
+7. **Phase 4 OFD validation** (#40, ~30 мин) — reject orders missing IKPU/packageCode когда pharmacy has Multicard. Skipped для PENDING_MANUAL_CONTACT (manual orders не идут через Multicard).
+
+8. **Phase 4 ReconcilePayments cron** (#41, ~1ч) — recover from lost Multicard callbacks. @nestjs/schedule installed. Every 5 min over Payments PENDING > 10 min → query gateway → atomic markPaidAtomically (CAS) → emit PaymentConfirmedEvent. Cap 50 per tick. Edge cases handled: pharmacy creds gone, gateway query fails, concurrent callback arrival.
+
+**Sprint 1 closed.** Pharmacy onboarding e2e в production. Phase 4 на 6/7. Audit на 7/9 critical+high closed.
+
+### Sprint 1 + Phase 4 smoke-test plan (recommended ДО next session)
+
+**Critical untested flow** — 7 PRs за один sitting → cumulative production behavior nigde не verified manually.
+
+**Buyer / pharmacy owner e2e (15 мин):**
+1. Open bot `@dorify` → `/start` → expect language picker [🇷🇺 Русский] [🇺🇿 O'zbek]
+2. Tap «Русский» → greeting + role choice [🛒 Купить / 🏪 Зарегистрировать аптеку]
+3. Tap «Зарегистрировать аптеку» → WebApp opens `/become-pharmacy`
+4. Step 1: name «Test Pharmacy 2» → slug auto-derives → live-check shows ✓
+5. Step 2: skip logo (либо upload — verify Caddy serves `https://api.dorify.uz/uploads/logos/<uuid>.webp`)
+6. Step 3: skip Multicard (либо ввести test creds)
+7. Step 4: agree → Submit → success view
+8. **Captain (admin) получает DM**: «Новая заявка на регистрацию аптеки» + [✓ Одобрить] [✗ Отклонить]
+9. Tap «Одобрить» → backend service-token call → owner получает DM «✓ Аптека одобрена»
+10. Open Mini App `/pharmacy/onboarding` → checklist shows: Одобрено ✓ / Add products (нет) / Multicard (зависит от шага 6)
+11. Add product → товар появляется в `app.dorify.uz/`
+12. Buyer (user 2) → /start → Купить → add product to cart → tap «Оплатить» либо «Отправить заявку» (зависит от Multicard)
+
+**Ключевые проверки:**
+- BackButton работает на каждом step wizard
+- Slug live-check responds в течение 1 sec
+- Logo upload завершается без timeout
+- Approval DM приходит в течение 5 sec
+- Reject flow с reason работает (admin tap «Отклонить» → bot asks reason → submit → owner получает с reason)
+- Per-pharmacy cart с 2 разными аптеками показывает 2 блока, каждый со своей CTA
 
 ### Хроника Session 4
 
