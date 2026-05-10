@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Query, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { Roles, UserRole } from '@common/decorators/roles.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '@common/pipes/zod-validation.pipe';
@@ -38,6 +38,16 @@ export class PharmacyController {
       throw new BadRequestException(parsed.error.errors[0]?.message ?? 'Invalid slug');
     }
     return this.iamService.checkSlugAvailability(parsed.data.slug);
+  }
+
+  /**
+   * Public read — used by buyer-side cart to render per-pharmacy blocks
+   * (Sprint 1 Day 6) с name + hasPaymentSettings flag для choice между
+   * Multicard checkout и manual contact flow.
+   */
+  @Get(':id')
+  getPharmacyById(@Param('id') id: string) {
+    return this.iamService.getPharmacyById(id);
   }
 
   @Get('profile')

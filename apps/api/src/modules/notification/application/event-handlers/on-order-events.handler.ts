@@ -22,7 +22,9 @@ export class OrderNotificationHandler {
 
   @OnEvent('order.created')
   async onOrderCreated(event: OrderCreatedEvent): Promise<void> {
-    // Notify pharmacy owner about new order
+    // Notify pharmacy owner about new order. Message differs based on
+    // status: manual contact = заявка + buyer contact (продавец звонит);
+    // PENDING = standard order awaiting payment confirmation.
     const pharmacy = await this.pharmacyRepo.findById(event.payload.pharmacyId);
     if (!pharmacy) return;
 
@@ -31,16 +33,22 @@ export class OrderNotificationHandler {
 
     const itemCount = event.payload.items.reduce((sum, i) => sum + i.quantity, 0);
     const amount = new Intl.NumberFormat('uz-UZ').format(event.payload.totalAmount);
+    const isManualContact = event.payload.status === 'PENDING_MANUAL_CONTACT';
 
-    await this.notifier.sendMessage(
-      owner.telegramId.toString(),
-      `🆕 <b>Новый заказ!</b>\n\n` +
-      `Заказ: #${event.payload.orderId.slice(-6)}\n` +
-      `Товаров: ${itemCount}\n` +
-      `Сумма: ${amount} сум`,
-    );
+    const text = isManualContact
+      ? `📞 <b>Новая заявка</b>\n\n` +
+        `Заявка #${event.payload.orderId.slice(-6)}\n` +
+        `Товаров: ${itemCount}\n` +
+        `Сумма: ${amount} сум\n` +
+        `Контакт покупателя: <code>${event.payload.contactPhone}</code>\n\n` +
+        `Свяжитесь с покупателем для подтверждения и оплаты.`
+      : `🆕 <b>Новый заказ!</b>\n\n` +
+        `Заказ: #${event.payload.orderId.slice(-6)}\n` +
+        `Товаров: ${itemCount}\n` +
+        `Сумма: ${amount} сум`;
 
-    this.logger.log(`Notified pharmacy owner about order ${event.payload.orderId}`);
+    await this.notifier.sendMessage(owner.telegramId.toString(), text);
+    this.logger.log(`Notified pharmacy owner about order ${event.payload.orderId} (status=${event.payload.status})`);
   }
 
   @OnEvent('order.confirmed')
