@@ -1,13 +1,33 @@
 # Dorify v2 — Comprehensive Audit Report
 
-**Date:** 2026-05-09
+**Date:** 2026-05-09 (audit) · **Last status update:** 2026-05-10 (Session 5 close)
 **Auditor:** Claude Code
 **Scope:** Backend API, Frontend Web, Telegram Bot, Infrastructure, Security
 **Branch:** `main`
 
-> **Note:** Original title — «Dorify v2 (GidStroy)». Auditor periodically
-> confused dorify-v2 с gidstroy (related project). False positives отмечены
-> ниже:
+## Status summary (2026-05-10)
+
+**Critical+High findings closed: 9/12.**
+
+| ID | Finding | Status | PR |
+|---|---|---|---|
+| **S-CRIT-1** | Hardcoded admin creds | ✅ closed | #31 |
+| **S-CRIT-3** | Math.random() для IDs | ✅ closed | #31 |
+| **S-CRIT-4** | Payment callback no IP whitelist | ✅ closed | #39 |
+| **S-CRIT-5** | DomainError → HTTP 500 | ✅ closed | #31 |
+| **S-HIGH-1** | InitData TTL = 24h → 5 min | ✅ closed | #31 |
+| **S-HIGH-4** | Order race condition | ✅ closed (atomic Postgres tx) | #39 |
+| **S-HIGH-5** | getCurrentUser empty strings | ✅ closed | #31 |
+| **S-HIGH-2** | No refresh token mechanism | ⏳ backlog (нужен Redis client) |  |
+| **S-HIGH-3** | No idempotency для placeOrder | ⏳ backlog (Redis либо DB-table) |  |
+| **S-HIGH-6** | UserRole leaked в domain layer | ⏳ backlog (architectural ~1h) |  |
+| **S-HIGH-7** | TenantContext used в application layer | ⏳ backlog (architectural ~2h) |  |
+| **S-CRIT-2** | TelegramAuthGuard global, JwtAuthGuard unused | ⏳ partial: service token guard ✅ (PR #29); JWT для admin SPA → Phase 8 |  |
+
+**Phase 4 (Multicard hardening) closed 7/7** (PR #39 IP whitelist + #40 OFD validation + #41 ReconcilePayments cron + #46 adapter retry).
+
+> **Note:** Original audit title — «Dorify v2 (GidStroy)». Auditor periodically
+> confused dorify-v2 с gidstroy (related project). False positives:
 >
 > - **C-CRIT-1** (apps/admin missing) — N/A для dorify, директория не в CI
 > - **C-CRIT-2** (Web Dockerfile package name mismatch) — N/A, `@dorify/web` correct
