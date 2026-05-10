@@ -9,6 +9,15 @@ import type { ExceptionFilter } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { DomainError } from '@shared/domain';
 
+/** Headers that may carry credentials/identity — must never reach logs. */
+const SENSITIVE_HEADERS = new Set([
+  'authorization',
+  'cookie',
+  'x-telegram-initdata',
+  'x-service-token',
+  'x-api-key',
+]);
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('ExceptionFilter');
@@ -25,8 +34,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const logFn = isClientError
       ? this.logger.warn.bind(this.logger)
       : this.logger.error.bind(this.logger);
+    const scrubbedHeaders = this.scrubHeaders(request.headers);
     logFn(
-      `${request.method} ${request.url} ${status}`,
+      `${request.method} ${request.url} ${status} headers=${JSON.stringify(scrubbedHeaders)}`,
       exception instanceof Error ? exception.stack : '',
     );
 
@@ -71,5 +81,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message: 'Internal server error',
       errors: undefined,
     };
+  }
+
+  /**
+   * Redact credentials/identity headers (audit P4.1). Returns a shallow copy —
+   * the request object itself is untouched.
+   */
+  private scrubHeaders(headers: Request['headers']): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(headers)) {
+      out[name] = SENSITIVE_HEADERS.has(name.toLowerCase()) ? '[REDACTED]' : value;
+    }
+    return out;
   }
 }
