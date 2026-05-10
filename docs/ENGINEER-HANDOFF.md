@@ -1,7 +1,7 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-10** (Session 5 — Sprint 1 closeout + Phase 4 hardening + audit deep batch 1).
+> Updated: **2026-05-10** (Session 5 close — Sprint 1 + Phase 4 hardening + audit deep batch 1 + production smoke test 4/5 blocks pass).
 
 ---
 
@@ -15,9 +15,9 @@
 - Session 3 Day 1-2 (2026-05-09, 11 PR #12–#22): полный design pass v2.
 - Session 3 Day 3 (2026-05-09, 2 PR #24–#25): закрытие 3 оставшихся ⏳ из POLISH_PLAN.
 - Session 4 (2026-05-09, 6 PR #27–#32): pharmacy onboarding spec adapt + CI hardening + Sprint 0 PR-1/PR-2 + audit Phase 1 quick wins.
-- **Session 5 (2026-05-10, 7 PR #34–#41):** Sprint 0 PR-3 closeout, full Sprint 1 (bot welcome + wizard + admin DM + per-pharmacy cart + onboarding), audit deep batch 1 (Order race + Callback IP whitelist), Phase 4 progress (OFD validation + ReconcilePayments cron). **Каждый день sprint'а отдельный PR за 1 sitting.**
-**Production live:** v2 frontend визуально готов 100%, **pharmacy onboarding e2e работает** (bot → wizard → admin DM → onboarding checklist), buyer cart с per-pharmacy Pattern A + manual contact fallback. Backend hardened: audit Phase 1 + 2 critical/high deep findings closed. Phase 4 на 6/7 (only Multicard adapter retry/idempotency remaining).
-**Next session:** Production e2e smoke testing first (untested cumulative behavior from 7 PRs), then audit batch 2 (Idempotency-Key + Refresh tokens, both требуют Redis client) либо Multicard adapter retry/idempotency.
+- **Session 5 (2026-05-10, 11 PR #34–#44):** Sprint 0 PR-3 closeout, full Sprint 1 Days 1-6 (bot welcome + wizard + admin DM + per-pharmacy cart + onboarding), audit deep batch 1 (Order race + Callback IP whitelist), Phase 4 (OFD validation + ReconcilePayments cron), 2 smoke fixes (#43 slug auto-derive, #44 verify DM web_app button), handoff docs.
+**Production live:** v2 frontend готов, pharmacy onboarding **e2e verified in production** (bot welcome → wizard → admin DM → approval → owner получает Mini App с initData → onboarding checklist). 4 из 5 smoke blocks ✅, **Block 5 (buyer cart) pending**. Backend hardened: audit Phase 1 + 2 critical/high deep closed; Phase 4 на 6/7.
+**Next session entry point:** Block 5 smoke (buyer cart с Multicard и manual contact для test pharmacy). Затем audit batch 2 (Idempotency-Key + Refresh tokens, нужен Redis client) либо Phase 4 final piece (Multicard adapter retry).
 
 ---
 
@@ -131,6 +131,38 @@
 | #39 | `fix(api): audit deep batch 1 — Order race transaction + Multicard callback IP whitelist` (placeAtomically с row-level lock, MulticardCallbackIpGuard, trust proxy) | +180/-24 |
 | #40 | `fix(api): OFD order-time validation` (Phase 4 closure — reject orders missing IKPU/packageCode когда pharmacy has Multicard) | +23 |
 | #41 | `feat(api): ReconcilePayments cron` (Phase 4 closure — @nestjs/schedule, 5min cron over PENDING > 10min, gateway query + atomic mark-paid) | +180 |
+| #42 | `docs: Session 5 handoff` | +73 docs |
+| #43 | `fix(web): wizard slug auto-derive` (smoke #1 — auto-derive только первый символ работал; SlugField теперь management state internally) | +35/-35 |
+| #44 | `fix(api): pharmacy.verified DM uses web_app button` (smoke #2 — plain URL DM не injected initData → Mini App 401 → onboarding all-grey; теперь web_app button) | +21/-4 |
+
+### Production env updates (Session 5)
+
+| Когда | Что | Причина |
+|---|---|---|
+| Session 5 mid | `BOT_TOKEN` → `@DorifyBot` token | Production bot должен быть `@DorifyBot`, был `@temrjanbot` (мониторинг) |
+| Session 5 mid | `WEBAPP_URL` → `https://app.dorify.uz` | Был `https://dorify.uz` (landing) — WebApp button открывал лендинг вместо Mini App |
+| Session 4 | `ADMIN_USERNAME` + `ADMIN_PASSWORD_HASH` ($-escaped) + `ADMIN_SERVICE_TOKEN` | Audit S-CRIT-1 fix |
+| Session 5 | `ADMIN_CHAT_IDS=8503214095` (api .env) + `API_URL=https://api.dorify.uz/api/v1` (bot .env) | Sprint 1 Day 5 deploy coordination |
+
+### Smoke test progress (Session 5 close)
+
+End-to-end pharmacy onboarding **verified в production** by Captain across 5 blocks. Last block (buyer flow) — pending.
+
+| Block | Что проверено | Status |
+|---|---|---|
+| **1** | Bot welcome — UZ/RU language picker, role choice, /language re-prompt | ✅ pass |
+| **2** | Wizard 4 шага — slug auto-derive, slug live-check, logo upload (Caddy + magic bytes), multi-call orchestration, Submit success view | ✅ pass (после fix #43 для slug auto-derive) |
+| **3** | Admin DM approval — admin gets DM с inline buttons, tap Одобрить → API call с X-Service-Token → owner получает DM | ✅ pass |
+| **4** | Pharmacy panel + onboarding — verify DM web_app button, Mini App opens с initData, onboarding checklist «Дождитесь одобрения» зелёным, products list 200 OK | ✅ pass (после fix #44 для web_app button) |
+| **5** | Buyer flow — Cart per-pharmacy блоки, Multicard checkout либо InquiryPage manual contact, seller получает DM с buyer phone | ⏳ pending |
+
+### Production verified data
+
+- **Test pharmacy 2** (admin-approved by Captain Session 5):
+  - id: `03ad18f8-bd83-452c-bf83-89f84dc5d332`
+  - name: «Тест Аптека 2», slug `test-apteka-2`
+  - logo: `https://api.dorify.uz/uploads/logos/a14d3a46-487b-4e1d-857d-80e27ac409ee.webp` (200, image/webp, Cache-Control 1d)
+  - isVerified=t, isActive=t
 
 ### Хроника Session 5
 
