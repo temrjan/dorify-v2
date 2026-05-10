@@ -1,7 +1,7 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-09** (Session 3 — Day 3 design pass closeout).
+> Updated: **2026-05-09** (Session 4 — pharmacy onboarding spec + Sprint 0 + audit Phase 1).
 
 ---
 
@@ -12,10 +12,11 @@
 **Captain language:** русский, directive-style. Устаёт от ceremony. **Sequential strictly** — не запускать parallel tool calls.
 **Last sessions shipped:**
 - Session 2 (2026-05-08, 6 PR #5–#10): payment frontend flow, pharmacy CRUD, CI/bot/CORS fixes.
-- Session 3 Day 1-2 (2026-05-09, 11 PR #12–#22): полный design pass v2 — foundation components, HomePage redesign, pharmacy pages polish, profile tab + theme toggle, catalog rename + master categories list.
-- **Session 3 Day 3 (2026-05-09, 2 PR #24–#25):** закрытие 3 оставшихся ⏳ из POLISH_PLAN — OrdersPage / ProductPage / Checkout / PaymentResult redesign + StatusBadge → Pill unification. **Дизайн-пасс v2 закрыт полностью.**
-**Production live:** v2 frontend визуально готов **на 100% по POLISH_PLAN**, buyer flow работает (browse → cart → checkout backend ready). Pharmacy panel functional.
-**Next session:** Phase 4 backend hardening (Multicard) или Tier 2/3 (orders, admin) — design backlog пуст.
+- Session 3 Day 1-2 (2026-05-09, 11 PR #12–#22): полный design pass v2.
+- Session 3 Day 3 (2026-05-09, 2 PR #24–#25): закрытие 3 оставшихся ⏳ из POLISH_PLAN.
+- **Session 4 (2026-05-09, 6 PR #27–#32):** pharmacy onboarding spec adapt + CI hardening + Sprint 0 PR-1 (admin endpoints + ServiceTokenGuard) + audit save/fix + Sprint 0 PR-2 (image upload module). Sprint 0 на 90% (PR-2 awaiting merge, PR-3 next).
+**Production live:** v2 frontend визуально готов на 100%. Backend hardening — **audit Phase 1 complete** (hardcoded creds removed, Math.random → crypto.randomUUID, DomainError → 400, InitData TTL 5 min, getCurrentUser fixed). CI deploy serialized (concurrency group). Image upload infrastructure готова (на сервере volume + Caddy config pending).
+**Next session:** Sprint 0 PR-3 (deps + logs scrub) → Sprint 1 (5-6 days: bot welcome flow + 4-step wizard + admin DM approval + per-pharmacy cart + onboarding checklist).
 
 ---
 
@@ -63,14 +64,14 @@
 | Фаза | Что | Статус (2026-05-09) | Что осталось |
 |---|---|---|---|
 | 0 | Foundation (repo, pnpm, NestJS, Prisma, CI/CD) | ✅ 100% | — |
-| 1 | IAM Module | ⚠️ ~95% | JwtAuthGuard wire (пока dead code), admin creds в env |
+| 1 | IAM Module | ✅ ~98% | Admin creds в env ✓ (Session 4 audit fix); ServiceTokenGuard ✓ (Sprint 0 PR-1); JwtAuthGuard wire (dead code, Phase 8) |
 | 2 | Catalog Module | ✅ ~98% | `getMyProduct` endpoint ✓; status filter в DTO ✓; **master categories list** ✓ (PR #22) |
 | 3 | Ordering Module | ⚠️ ~90% | Admin order controller отсутствует |
 | 4 | Payment Module | ⚠️ ~85% | Frontend payment flow ✓; WEB_URL env ✓. **Остаются:** OFD order-time validation, ReconcilePayments cron, CallbackIpGuard, Idempotency-Key + retry в adapter (см. `docs/multicard-1/README.md` §8) |
 | 5 | Frontend | ✅ ~85% | **Design pass v2 done** (Sessions 3): HomePage / SearchPage→CatalogPage / Cart / Pharmacy panel / Profile. Theme toggle с persistent override. `/payment/result` polling ✓. **Остаются:** Checkout polish (sticky bar OK), PaymentResult states polish, OrdersPage redesign, pharmacy orders list, pharmacy payment-settings UI, Admin SPA |
-| 6 | Bot + Notifications | ⚠️ ~50% | WEBAPP_URL default fix ✓; pharmacy registration wizard — TODO |
+| 6 | Bot + Notifications | ⚠️ ~50% | WEBAPP_URL default fix ✓; pharmacy registration wizard — Sprint 1 (spec ready: docs/PHARMACY_ONBOARDING_SPEC.md) |
 | 7 | Search (Avi) | ⚠️ ~30% | Qdrant→pgvector переход (Captain decision), Product события chain, frontend AI search UI |
-| 8 | Audit + Security + Migrate | ⚠️ ~20% | AES encryption ✓; CI resilient deploy ✓; CORS prod-default ✓; **seed скрипт** ✓ (PR #14). **TODO:** миграция v1→v2, AuditInterceptor, rate limiting, input sanitization |
+| 8 | Audit + Security + Migrate | ⚠️ ~40% | AES encryption ✓; CI resilient deploy ✓; CORS prod-default ✓; seed ✓; CI concurrency group ✓ (PR #28); **audit Phase 1 closed** ✓ (PR #31): hardcoded creds removed, Math.random→crypto.randomUUID, DomainError→400, TTL 5 min, getCurrentUser fixed. **TODO:** миграция v1→v2, AuditInterceptor, rate limiting, idempotency keys, refresh tokens, payment race transaction |
 
 **Roadmap до cutover:** ~7-10 рабочих дней (Phase 4 closure + admin SPA + bot wizard + migration). Frontend design в основном завершён.
 
@@ -106,7 +107,38 @@
 | #24 | `feat(web): design polish — OrdersPage, ProductPage, StatusBadge unify` (PR-1 buyer flow closeout) | +210/-88 LOC |
 | #25 | `feat(web): design polish — CheckoutPage + PaymentResultPage` (PR-2 checkout flow closeout) | +237/-141 LOC |
 
-### Хроника Session 3
+## Что отгружено в Session 4 (2026-05-09) — pharmacy onboarding spec + Sprint 0 + audit
+
+| PR | Содержание | Размер |
+|---|---|---|
+| #27 | `docs: pharmacy onboarding spec v1.1` (adapted из gidstroy под dorify auth/routing/Multicard) | +439 LOC |
+| #28 | `ci: serialize deploys via concurrency group` (предотвращает orphan-container race из Session 3 incident #9) | +5 LOC |
+| #29 | `feat(api): pharmacy admin endpoints + check-slug + ServiceTokenGuard` (Sprint 0 PR-1) | +305/-4 LOC |
+| #30 | `docs: save Claude Code audit report` | +521 LOC docs |
+| #31 | `fix(api): audit Phase 1 quick wins` (5 critical/high closed: hardcoded creds, Math.random, DomainError 500→400, InitData TTL 86400→300, getCurrentUser broken) | +143/-48 LOC |
+| #32 | `feat(api): image upload module — StoragePort + local disk adapter` (Sprint 0 PR-2, sharp + magic bytes + path traversal hardening) | +713 LOC, **awaiting merge** |
+
+### Хроника Session 4
+
+1. **Pharmacy onboarding spec adapt** (PR #27): прочитал gidstroy 700-line spec, отфильтровал false positives (gidstroy не = dorify), переписал в 439 строк под dorify stack — Telegram auth (нет bcrypt+STORE_OWNER login), routing /pharmacy/* (single-user→1 pharmacy), service-token admin auth, Pattern A cart (per-pharmacy блоки + manual contact fallback), local disk storage с Hexagonal port abstraction, 5-6 days Sprint 1 estimate.
+
+2. **CI hardening proactive** (PR #28): добавлен `concurrency: { group: deploy-main, cancel-in-progress: false }` — третий incident такого класса ловить не хотим в Sprint 0/1 multi-PR sequence.
+
+3. **Sprint 0 PR-1** (PR #29): admin verify/reject + check-slug + service token guard + PharmacyVerified/Rejected events + fix orphan PharmacyCreatedEvent. 131 tests pass.
+
+4. **Audit save** (PR #30): сохранён комплексный audit report от Claude Code в `docs/AUDIT_REPORT.md` с filtered false positives (auditor путал dorify с gidstroy в нескольких местах).
+
+5. **Audit Phase 1 quick wins** (PR #31, ~2h): 5 критических/high findings закрыты:
+   - **S-CRIT-1:** Hardcoded admin creds → ENV (`ADMIN_USERNAME` + bcrypt hash via Zod regex validate)
+   - **S-CRIT-3:** `Math.random()` для IDs → centralized `generateId()` через `crypto.randomUUID()` (5+ файлов унифицированы)
+   - **S-CRIT-5:** `DomainError` → HTTP 400 (было 500, masked validation errors). Bonus: 4xx logged at warn, 5xx at error.
+   - **S-HIGH-1:** InitData TTL 24h → 5 min (replay window minimized).
+   - **S-HIGH-5:** `getCurrentUser` empty strings fixed (TelegramAuthGuard теперь attaches firstName/lastName/username в request.user).
+   - 134 tests pass (+3 для filter spec).
+
+6. **Sprint 0 PR-2** (PR #32, awaiting merge): image upload module через `StoragePort` + `LocalDiskStorageAdapter`. Pipeline: file-type magic bytes → sharp resize 1200px max + WebP + EXIF strip → write to volume. Path traversal canonical resolve check в delete(). 140 tests pass (+6 для adapter spec).
+
+### Хроника инцидентов / lessons
 
 1. **Foundation first** (PR #12): theme extends + base components (Skeleton, EmptyState, Pill, IconCheck/X/Alert/Clock/Package/Store/Card/User/ChevronRight). Lucide-react **не добавлен** — расширили существующий `icons.tsx` (lucide-стиль уже был).
 
@@ -151,7 +183,17 @@
 
 8. **Tabbar bg от @telegram-apps/telegram-ui не tied к theme vars.** CSS module hashed class содержит `Tabbar_wrapper`. **Override (PR #17):** `[class*="Tabbar_wrapper"] { background: var(--tg-theme-secondary-bg-color) !important; }` в `index.css`.
 
-9. **Concurrent merges → CI deploy race с orphan containers.** Day 3: PR #24 и #25 merged через 16 секунд → два concurrent deploy job'a → второй упал на `Container dorify-bot Error response from daemon: Conflict. The container name "/03531ad5f8d6_dorify-bot" is already in use`. На сервере 3 orphan контейнера в `Created` state, running контейнеры — старые images. **Recovery:** SSH manually → `docker rm -f <orphan-ids>` → `docker compose build && up -d --force-recreate`. Затем `gh run rerun` для clean CI history. **Backlog hardening:** добавить `concurrency: { group: deploy-main, cancel-in-progress: false }` в `.github/workflows/ci.yml` deploy job — сериализует деплои на main, race пропадает. Это **третий incident такого класса** (Session 2 — git pull conflict, Session 3 Day 1 — этот же), permanent fix отложен. Quick fix ~5 LOC.
+9. **Concurrent merges → CI deploy race с orphan containers.** Day 3: PR #24 и #25 merged через 16 секунд → два concurrent deploy job'a → второй упал на `Container dorify-bot Error response from daemon: Conflict. The container name "/03531ad5f8d6_dorify-bot" is already in use`. На сервере 3 orphan контейнера в `Created` state, running контейнеры — старые images. **Recovery:** SSH manually → `docker rm -f <orphan-ids>` → `docker compose build && up -d --force-recreate`. Затем `gh run rerun` для clean CI history. **Permanent fix:** PR #28 (Session 4) — `concurrency: { group: deploy-main, cancel-in-progress: false }` в deploy job. **Закрыто.**
+
+**Session 4:**
+
+10. **Required env var added без deploy coordination → 3-hour production crash loop.** PR #29 (Sprint 0 PR-1) добавил `ADMIN_SERVICE_TOKEN` как required env через Zod validation. CI auto-deploy задеплоил новый код, backend упал на boot (`Required: ADMIN_SERVICE_TOKEN`), `restart: unless-stopped` зациклил перезапуск. **Captain не получил alert** — frontend (`app.dorify.uz`) static, был up; bot up; только backend down. External health не проверялся ~3h до Session 4 продолжения. **Recovery:** SSH → append `ADMIN_SERVICE_TOKEN=<32-hex>` в `/opt/dorify-v2/.env` + `apps/bot/.env` (для Sprint 1 Day 4) → `docker compose up -d --force-recreate dorify-backend` → health 200. **Process lesson:** любой PR adding required env MUST включать deploy-time coordination в PR description. Альтернативно — env var optional с fallback default + warn at startup.
+
+11. **bcrypt hash в Docker Compose `.env` нужен `$$` escape.** `ADMIN_PASSWORD_HASH=$2b$10$q9I12...` → compose интерпретировал `$q9I12...` как variable substitution → mangled value `$2b$10/MGH6` в контейнере → Zod regex отвергнет на boot после PR #31 merge. Fix в .env: replace `$` → `$$` (compose substitutes `$$` → `$` при passing to container). Documented в PR #31 + `apps/api/.env.example`. **Применять для любого env value содержащего `$` в Docker Compose env_file.**
+
+12. **Audit auditor confused dorify с gidstroy.** `docs/AUDIT_REPORT.md` содержит ~30 findings, но 4 false positives (apps/admin missing, @dorify/web mismatch, ALLOWED_ORIGINS legacy, api fallback legacy) — N/A для dorify. Filtered в шапке документа.
+
+13. **`file-type` v22 ESM-only → downgrade до v16 для CJS.** NestJS default tsconfig — `module: commonjs`. file-type v22 — pure ESM exports. Решение: pinned `file-type@16.5.4`. `sharp` — CJS, но default export не типизирован → используем `import sharp = require('sharp')` (TS import-equals) + `eslint-disable @typescript-eslint/no-require-imports` per-line.
 
 ### Производственные доступы (что точно сейчас работает)
 
@@ -165,6 +207,17 @@
 - `https://app.dorify.uz/payment/result?orderId=...`: polling page.
 - Telegram bot `@dorify` `/start` → кнопки → app.dorify.uz / app.dorify.uz/pharmacy.
 - CORS: `app.dorify.uz`, `pharmacy.dorify.uz`, `admin.dorify.uz`.
+- **Sprint 0 endpoints (Session 4):**
+  - `GET /api/v1/pharmacy/check-slug?slug=...` (public, через TelegramAuthGuard) → `{available, suggestion?}`
+  - `POST /api/v1/admin/pharmacies/:id/{verify,reject}` (header `X-Service-Token`)
+  - `POST /api/v1/uploads/image?scope=logos|products` (multipart/form-data, 5 MB max) → `{url, bytes, format}`
+- **Caddy config pending** для `/uploads/*` static serve. Volume `dorify_uploads` создан в docker-compose.yml; Caddy handler нужно добавить:
+  ```
+  handle /uploads/* {
+    root * /var/lib/docker/volumes/dorify-v2_dorify_uploads/_data
+    file_server
+  }
+  ```
 
 ### Seed data в production БД
 
@@ -181,6 +234,8 @@
 - Backend categories permissive (любая string). UI master list только enforces UI workflow — direct API call может попасть arbitrary string.
 - Multicard adapter без retry / Idempotency-Key / IP whitelist — Phase 4 closure pending.
 - `apps/bot/.env` ≠ `/opt/dorify-v2/.env` — env-edits для бота нужны в первом файле; `restart` НЕ перечитывает env_file → `up -d --force-recreate`.
+- **Audit Phase 1 deep findings (~7h)** — НЕ закрыты: Idempotency-Key для placeOrder (Redis), order placement transaction (`SELECT FOR UPDATE`), refresh token mechanism, payment IP whitelist (S-CRIT-4 — Phase 4 closure overlap).
+- **Caddy `/uploads/*` static serve config** — pending Captain task на сервере (см. Производственные доступы).
 
 ---
 
@@ -201,12 +256,20 @@
 - `MULTICARD_CALLBACK_URL` — opt., default `https://api.dorify.uz/api/v1/payments/callback`.
 - `WEB_URL` — default `https://app.dorify.uz` (PR #6); фронт-домен куда возвращается user после Multicard checkout.
 - `ALLOWED_ORIGINS` — после PR #10 default включает app/pharmacy/admin .dorify.uz; env override опционален.
+- **`ADMIN_SERVICE_TOKEN`** (Session 4 PR #29) — 32+ chars hex, shared между api + bot. Required, validated Zod. **Generate:** `openssl rand -hex 32`. Хранится в password manager.
+- **`ADMIN_USERNAME`** (Session 4 PR #31) — default `admin`, override в production желательно.
+- **`ADMIN_PASSWORD_HASH`** (Session 4 PR #31) — bcrypt cost 10, ровно 60 chars в формате `$2[ayb]$NN$...`. **CRITICAL:** в `.env` `$` нужно escape как `$$` (compose interpolation). Хранится в password manager.
+- `STORAGE_PATH` — default `/opt/dorify-v2/uploads` (Session 4 PR #32). Volume `dorify_uploads`.
+- `STORAGE_BASE_URL` — default `https://api.dorify.uz/uploads`.
+- `STORAGE_MAX_BYTES` — default 5_242_880 (5 MiB).
+- `INIT_DATA_TTL_SECONDS` — default **300** (Session 4 PR #31, было 86400).
 
 **Bot (`/opt/dorify-v2/apps/bot/.env`)** — read by `dorify-bot` контейнер:
 - `BOT_TOKEN`
 - `WEBAPP_URL` — после PR #9 default `https://app.dorify.uz`; явный override желателен.
 - `HEALTH_PORT` — default 3002
-- `ADMIN_CHAT_IDS`
+- `ADMIN_CHAT_IDS` — comma-separated chat IDs для approval DM (Sprint 1 Day 4 wire pending)
+- **`ADMIN_SERVICE_TOKEN`** (Session 4) — mirror of api .env value. Bot будет использовать для admin endpoint calls (Sprint 1 Day 4).
 
 ### Local toolchain
 ```
