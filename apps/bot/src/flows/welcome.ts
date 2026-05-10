@@ -5,6 +5,8 @@ import { languageKeyboard, roleKeyboard, webAppKeyboard } from '../keyboards';
 
 export interface SessionData {
   lang?: Lang;
+  /** When admin clicks «Reject» — pharmacyId awaiting reason text. */
+  pendingRejectPharmacyId?: string;
 }
 
 export type BotContext = Context & SessionFlavor<SessionData>;

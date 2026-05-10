@@ -2,6 +2,7 @@ import { Bot, session } from 'grammy';
 import express from 'express';
 import { config } from './config';
 import { welcome, type BotContext, type SessionData } from './flows/welcome';
+import { admin } from './flows/admin';
 
 async function main(): Promise<void> {
   const bot = new Bot<BotContext>(config.BOT_TOKEN);
@@ -15,6 +16,9 @@ async function main(): Promise<void> {
     }),
   );
 
+  // Admin composer first — its message:text catcher passes through `next()`
+  // when no pending reject, so welcome composer still handles non-admin text.
+  bot.use(admin);
   bot.use(welcome);
 
   bot.catch((err) => {
