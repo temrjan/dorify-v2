@@ -10,6 +10,9 @@ export class OrderCreatedEvent extends DomainEvent {
       buyerId: string;
       items: Array<{ productId: string; quantity: number }>;
       totalAmount: number;
+      contactPhone: string;
+      /** PENDING (Multicard) либо PENDING_MANUAL_CONTACT (no Multicard creds). */
+      status: 'PENDING' | 'PENDING_MANUAL_CONTACT';
     },
   ) {
     super();

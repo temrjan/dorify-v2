@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CatalogModule } from '../catalog/catalog.module';
+import { IamModule } from '../iam/iam.module';
 import { OrderingService } from './application/ordering.service';
 import { OnOrderCreatedDecrementStock } from './application/event-handlers/on-order-created.handler';
 import { OnOrderCancelledRestoreStock } from './application/event-handlers/on-order-cancelled.handler';
@@ -8,7 +9,7 @@ import { PrismaOrderRepository } from './infrastructure/persistence/prisma-order
 import { ORDER_REPOSITORY } from './domain/repositories/order.repository';
 
 @Module({
-  imports: [CatalogModule],
+  imports: [CatalogModule, IamModule],
   controllers: [BuyerOrderController, PharmacyOrderController],
   providers: [
     OrderingService,

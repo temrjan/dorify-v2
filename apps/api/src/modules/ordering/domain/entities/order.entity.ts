@@ -29,7 +29,9 @@ export enum PaymentStatus {
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-  [OrderStatus.PENDING_MANUAL_CONTACT]: [],
+  // Manual contact: pharmacy без Multicard. Продавец может принять
+  // (CONFIRMED — без оплаты, договорились) либо отказать (CANCELLED).
+  [OrderStatus.PENDING_MANUAL_CONTACT]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
   [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
   [OrderStatus.PREPARING]: [OrderStatus.READY],
   [OrderStatus.READY]: [OrderStatus.DELIVERING],
@@ -37,6 +39,12 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.DELIVERED]: [],
   [OrderStatus.CANCELLED]: [],
 };
+
+const CANCELLABLE_STATUSES: OrderStatus[] = [
+  OrderStatus.PENDING,
+  OrderStatus.PENDING_MANUAL_CONTACT,
+  OrderStatus.CONFIRMED,
+];
 
 interface OrderProps {
   pharmacyId: string;
@@ -66,6 +74,11 @@ export class Order extends AggregateRoot<OrderProps> {
     deliveryAddress?: string;
     contactPhone: string;
     comment?: string;
+    /**
+     * Initial status. PENDING — онлайн-оплата через Multicard;
+     * PENDING_MANUAL_CONTACT — заявка для аптек без Multicard creds.
+     */
+    initialStatus?: OrderStatus.PENDING | OrderStatus.PENDING_MANUAL_CONTACT;
   }): Order {
     if (params.items.length === 0) {
       throw new DomainError('Order must have at least one item');
@@ -76,11 +89,13 @@ export class Order extends AggregateRoot<OrderProps> {
       Money.zero(),
     );
 
+    const initialStatus = params.initialStatus ?? OrderStatus.PENDING;
+
     const order = new Order(params.id, {
       pharmacyId: params.pharmacyId,
       buyerId: params.buyerId,
       items: params.items,
-      status: OrderStatus.PENDING,
+      status: initialStatus,
       paymentStatus: PaymentStatus.PENDING,
       totalAmount,
       deliveryType: params.deliveryType ?? 'PICKUP',
@@ -99,6 +114,8 @@ export class Order extends AggregateRoot<OrderProps> {
         quantity: item.quantity,
       })),
       totalAmount: totalAmount.amount,
+      contactPhone: params.contactPhone,
+      status: initialStatus === OrderStatus.PENDING_MANUAL_CONTACT ? 'PENDING_MANUAL_CONTACT' : 'PENDING',
     }));
 
     return order;
@@ -139,8 +156,7 @@ export class Order extends AggregateRoot<OrderProps> {
   }
 
   cancel(reason?: string): void {
-    const cancellable = [OrderStatus.PENDING, OrderStatus.CONFIRMED];
-    if (!cancellable.includes(this.props.status)) {
+    if (!CANCELLABLE_STATUSES.includes(this.props.status)) {
       throw new DomainError(`Cannot cancel order in status ${this.props.status}`);
     }
 
@@ -190,6 +206,10 @@ export class Order extends AggregateRoot<OrderProps> {
   get createdAt(): Date { return this.props.createdAt; }
 
   isCancellable(): boolean {
-    return [OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(this.props.status);
+    return CANCELLABLE_STATUSES.includes(this.props.status);
+  }
+
+  isManualContact(): boolean {
+    return this.props.status === OrderStatus.PENDING_MANUAL_CONTACT;
   }
 }

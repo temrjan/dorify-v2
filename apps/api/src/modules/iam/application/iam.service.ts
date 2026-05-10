@@ -153,6 +153,14 @@ export class IamService {
     return this.toPharmacyResponse(pharmacy);
   }
 
+  async getPharmacyById(pharmacyId: string): Promise<PharmacyResponse> {
+    const pharmacy = await this.pharmacyRepo.findById(pharmacyId);
+    if (!pharmacy) {
+      throw new NotFoundException(`Pharmacy ${pharmacyId} not found`);
+    }
+    return this.toPharmacyResponse(pharmacy);
+  }
+
   async updatePharmacyProfile(ownerId: string, dto: UpdatePharmacyDto): Promise<PharmacyResponse> {
     const pharmacy = await this.pharmacyRepo.findByOwnerId(ownerId);
     if (!pharmacy) {

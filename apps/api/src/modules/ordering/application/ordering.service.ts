@@ -5,6 +5,8 @@ import { ORDER_REPOSITORY } from '../domain/repositories/order.repository';
 import type { OrderRepository } from '../domain/repositories/order.repository';
 import { PRODUCT_REPOSITORY } from '../../catalog/domain/repositories/product.repository';
 import type { ProductRepository } from '../../catalog/domain/repositories/product.repository';
+import { PHARMACY_REPOSITORY } from '../../iam/domain/repositories/pharmacy.repository';
+import type { PharmacyRepository } from '../../iam/domain/repositories/pharmacy.repository';
 import { Order, OrderStatus } from '../domain/entities/order.entity';
 import { OrderItem } from '../domain/entities/order-item.entity';
 import type { PaginatedResult } from '@common/dto/pagination.dto';
@@ -18,6 +20,7 @@ export class OrderingService {
   constructor(
     @Inject(ORDER_REPOSITORY) private readonly orderRepo: OrderRepository,
     @Inject(PRODUCT_REPOSITORY) private readonly productRepo: ProductRepository,
+    @Inject(PHARMACY_REPOSITORY) private readonly pharmacyRepo: PharmacyRepository,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -54,7 +57,18 @@ export class OrderingService {
       }));
     }
 
-    // 2. Create Order (Aggregate Root)
+    // 2. Determine initial status — Multicard configured = PENDING (online
+    //    payment expected), no Multicard = PENDING_MANUAL_CONTACT (заявка,
+    //    seller calls buyer).
+    const pharmacy = await this.pharmacyRepo.findById(dto.pharmacyId);
+    if (!pharmacy) {
+      throw new NotFoundException(`Pharmacy ${dto.pharmacyId} not found`);
+    }
+    const initialStatus = pharmacy.hasMulticardCredentials()
+      ? OrderStatus.PENDING
+      : OrderStatus.PENDING_MANUAL_CONTACT;
+
+    // 3. Create Order (Aggregate Root)
     const order = Order.create({
       id: generateId(),
       pharmacyId: dto.pharmacyId,
@@ -64,6 +78,7 @@ export class OrderingService {
       deliveryAddress: dto.deliveryAddress,
       contactPhone: dto.contactPhone,
       comment: dto.comment,
+      initialStatus,
     });
 
     // 3. Save

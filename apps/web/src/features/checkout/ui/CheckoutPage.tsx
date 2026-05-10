@@ -1,13 +1,12 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Input, Text, Spinner } from '@telegram-apps/telegram-ui';
 import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useCartStore, selectTotalPrice, selectItemsByPharmacy } from '@shared/stores/cartStore';
+import { useCartStore, selectItemsByPharmacy } from '@shared/stores/cartStore';
 import { ordersApi } from '@shared/api/orders';
 import { paymentsApi } from '@shared/api/payments';
 import { PriceTag } from '@shared/ui/PriceTag';
 import { IconStore, IconPackage, IconAlert } from '@shared/ui/icons';
-import type { Order } from '@shared/types';
 
 type DeliveryType = 'PICKUP' | 'DELIVERY';
 
@@ -61,10 +60,22 @@ function DeliveryOption({ active, icon, title, description, onClick }: DeliveryO
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pharmacyId = searchParams.get('pharmacyId');
+
   const items = useCartStore((s) => s.items);
   const clearPharmacy = useCartStore((s) => s.clearPharmacy);
-  const totalPrice = useCartStore(selectTotalPrice);
   const itemsByPharmacy = useCartStore(selectItemsByPharmacy);
+
+  // Resolve target pharmacy: explicit ?pharmacyId= wins, else first in cart.
+  const targetPharmacyId = pharmacyId ?? Array.from(itemsByPharmacy.keys())[0];
+  const pharmacyItems = targetPharmacyId
+    ? itemsByPharmacy.get(targetPharmacyId) ?? []
+    : [];
+  const pharmacyTotal = pharmacyItems.reduce(
+    (sum, i) => sum + i.product.price * i.quantity,
+    0,
+  );
 
   const [phone, setPhone] = useState(() => {
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -76,7 +87,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     tg?.BackButton.show();
-    const handler = () => navigate(-1);
+    const handler = () => navigate('/cart');
     tg?.BackButton.onClick(handler);
     return () => {
       tg?.BackButton.offClick(handler);
@@ -84,66 +95,54 @@ export default function CheckoutPage() {
     };
   }, [navigate]);
 
-  type CheckoutResult =
-    | { kind: 'redirect'; checkoutUrl: string }
-    | { kind: 'orders' };
-
   const mutation = useMutation({
-    mutationFn: async (): Promise<CheckoutResult> => {
-      const pharmacyIds = Array.from(itemsByPharmacy.keys());
-      const isSinglePharmacy = pharmacyIds.length === 1;
-      const createdOrders: Order[] = [];
+    mutationFn: async () => {
+      if (!targetPharmacyId) throw new Error('Не выбрана аптека');
 
-      for (const pharmacyId of pharmacyIds) {
-        const pharmacyItems = itemsByPharmacy.get(pharmacyId)!;
-        const order = await ordersApi.place({
-          pharmacyId,
-          items: pharmacyItems.map((i) => ({
-            productId: i.product.id,
-            quantity: i.quantity,
-          })),
-          deliveryType,
-          contactPhone: phone,
-          deliveryAddress: deliveryType === 'DELIVERY' ? address : undefined,
-        });
-        createdOrders.push(order);
-        clearPharmacy(pharmacyId);
-      }
+      const order = await ordersApi.place({
+        pharmacyId: targetPharmacyId,
+        items: pharmacyItems.map((i) => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+        })),
+        deliveryType,
+        contactPhone: phone,
+        deliveryAddress: deliveryType === 'DELIVERY' ? address : undefined,
+      });
 
-      if (!isSinglePharmacy || !createdOrders[0]) {
-        return { kind: 'orders' };
+      // Order created. If pharmacy has Multicard — redirect to checkout.
+      // If status came back as PENDING_MANUAL_CONTACT — order is заявка,
+      // bot DM'нет продавцу автоматически (notification handler).
+      if (order.status === 'PENDING_MANUAL_CONTACT') {
+        clearPharmacy(targetPharmacyId);
+        return { kind: 'manual' as const, orderId: order.id };
       }
 
-      const payment = await paymentsApi.create(createdOrders[0].id);
-      if (!payment.checkoutUrl) {
-        throw new Error('Не получилось получить ссылку оплаты');
+      const payment = await paymentsApi.create(order.id);
+      if (!payment.checkoutUrl?.startsWith('https://')) {
+        throw new Error('Не удалось получить ссылку оплаты');
       }
-      if (!payment.checkoutUrl.startsWith('https://')) {
-        throw new Error('Неподдерживаемая ссылка оплаты');
-      }
-      return { kind: 'redirect', checkoutUrl: payment.checkoutUrl };
+      clearPharmacy(targetPharmacyId);
+      return { kind: 'redirect' as const, checkoutUrl: payment.checkoutUrl };
     },
     onSuccess: (result) => {
       if (result.kind === 'redirect') {
-        window.location.href = result.checkoutUrl;
-        return;
-      }
-      navigate('/orders');
-    },
-    onError: () => {
-      if (useCartStore.getState().items.length === 0) {
-        navigate('/orders');
+        window.location.assign(result.checkoutUrl);
+      } else {
+        navigate('/cart', { replace: true });
       }
     },
   });
 
-  if (items.length === 0) {
+  if (items.length === 0 || !targetPharmacyId) {
     navigate('/cart');
     return null;
   }
 
-  const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
-  const canSubmit = phone.trim().length > 0 && (deliveryType === 'PICKUP' || address.trim().length > 0);
+  const totalQty = pharmacyItems.reduce((sum, i) => sum + i.quantity, 0);
+  const canSubmit =
+    phone.trim().length > 0 &&
+    (deliveryType === 'PICKUP' || address.trim().length > 0);
 
   return (
     <div className="pb-6">
@@ -151,7 +150,6 @@ export default function CheckoutPage() {
         <Text className="text-lg font-bold">Оформление заказа</Text>
       </div>
 
-      {/* Контакт */}
       <Section title="Контакт">
         <Input
           type="tel"
@@ -161,7 +159,6 @@ export default function CheckoutPage() {
         />
       </Section>
 
-      {/* Доставка */}
       <Section title="Способ получения">
         <div className="flex gap-2">
           <DeliveryOption
@@ -191,7 +188,6 @@ export default function CheckoutPage() {
         )}
       </Section>
 
-      {/* Заказ */}
       <Section title="Ваш заказ">
         <div className="flex justify-between text-sm">
           <span className="text-tg-hint">Товаров</span>
@@ -200,11 +196,10 @@ export default function CheckoutPage() {
         <div className="h-px bg-tg-secondary my-3" />
         <div className="flex justify-between items-baseline">
           <span className="text-tg-hint">Итого</span>
-          <PriceTag amount={totalPrice} className="text-lg" />
+          <PriceTag amount={pharmacyTotal} className="text-lg" />
         </div>
       </Section>
 
-      {/* Error */}
       {mutation.isError && (
         <div className="px-4 mt-4">
           <div className="bg-dorify-error-light text-dorify-error rounded-card p-3 flex items-start gap-2">
@@ -212,13 +207,12 @@ export default function CheckoutPage() {
             <Text className="text-sm">
               {mutation.error instanceof Error
                 ? mutation.error.message
-                : 'Не удалось завершить оформление. Откройте «Мои заказы».'}
+                : 'Не удалось оформить заказ. Попробуйте ещё раз.'}
             </Text>
           </div>
         </div>
       )}
 
-      {/* Submit — inline (per Cart lesson PR #20: no fixed bottom bar) */}
       <div className="px-4 mt-5">
         <Button
           mode="filled"
@@ -228,7 +222,11 @@ export default function CheckoutPage() {
           disabled={!canSubmit || mutation.isPending}
           className="!bg-dorify-primary"
         >
-          {mutation.isPending ? <Spinner size="s" /> : `Оформить · ${new Intl.NumberFormat('uz-UZ').format(totalPrice)} сум`}
+          {mutation.isPending ? (
+            <Spinner size="s" />
+          ) : (
+            `Оплатить · ${new Intl.NumberFormat('uz-UZ').format(pharmacyTotal)} сум`
+          )}
         </Button>
       </div>
     </div>
