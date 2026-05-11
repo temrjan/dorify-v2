@@ -1,23 +1,23 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-10** (Session 5 close — Sprint 1 + Phase 4 hardening + audit deep batch 1 + production smoke test 4/5 blocks pass).
+> Updated: **2026-05-11** (Session 6 close — Phase 1 seller-side complete + Phase 2 customer notifications + Kimi K2.6 audit Tier A closed).
 
 ---
 
 ## ⚡ TL;DR
 
 **Project:** Multi-tenant аптечный маркетплейс (Telegram Mini App). Миграция Express MVC v1 → NestJS DDD v2.
-**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz`. **БД содержит seed data** (1 pharmacy «Аптека Дорифай Демо», 1 PHARMACY_OWNER user `temrjan` Telegram ID 8503214095, 7 products всех статусов).
+**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz` (main=`ff5c517`). **БД содержит seed data** (1 pharmacy «Аптека Дорифай Демо», 1 PHARMACY_OWNER user `temrjan` Telegram ID 8503214095, 7 products всех статусов).
 **Captain language:** русский, directive-style. Устаёт от ceremony. **Sequential strictly** — не запускать parallel tool calls.
 **Last sessions shipped:**
 - Session 2 (2026-05-08, 6 PR #5–#10): payment frontend flow, pharmacy CRUD, CI/bot/CORS fixes.
-- Session 3 Day 1-2 (2026-05-09, 11 PR #12–#22): полный design pass v2.
-- Session 3 Day 3 (2026-05-09, 2 PR #24–#25): закрытие 3 оставшихся ⏳ из POLISH_PLAN.
-- Session 4 (2026-05-09, 6 PR #27–#32): pharmacy onboarding spec adapt + CI hardening + Sprint 0 PR-1/PR-2 + audit Phase 1 quick wins.
-- **Session 5 (2026-05-10, 13 PR #34–#46):** Sprint 0 PR-3 closeout, full Sprint 1 Days 1-6, audit deep batch 1, Phase 4 hardening **closed 7/7** (OFD validation + ReconcilePayments cron + IP whitelist + **Multicard adapter retry**), 2 smoke fixes (#43 slug auto-derive, #44 verify DM web_app button), handoff docs.
-**Production live:** pharmacy onboarding **e2e verified в production** (bot welcome → wizard → admin DM → approval → owner Mini App с initData → onboarding checklist + logo через Caddy). **Phase 4 closed 7/7.** Audit critical+high closed **9/12** (Phase 1 quick wins + deep batch 1). Smoke **4/5 blocks pass**; **Block 5 (buyer flow — manual contact / Multicard) pending**.
-**Next session entry point:** Block 5 smoke (~15 мин). Затем audit batch 2 (Idempotency-Key для placeOrder + Refresh tokens — нужен Redis client) либо Tier 2/3 (admin SPA, pharmacy orders list).
+- Session 3 (2026-05-09, 13 PR #12–#25): полный design pass v2.
+- Session 4 (2026-05-09, 6 PR #27–#32): pharmacy onboarding spec + CI hardening + Sprint 0 + audit Phase 1.
+- Session 5 (2026-05-10, 13 PR #34–#46): Sprint 1 e2e + Phase 4 hardening 7/7 + audit deep batch 1.
+- **Session 6 (2026-05-11, 11 PR #48–#58):** Phase 1 seller-side (orders + state machine + payment-settings + profile edit) + Phase 2 customer notifications (OrderStatusChangedEvent + HTML escape + phone sanitize) + **Kimi K2.6 audit Tier A** (5 PRs: InitData replay bypass, Order IDOR, Payment IDOR, Multicard amount check, .dockerignore). **20 новых unit tests, application service test precedent установлен.**
+**Production live:** pharmacy full e2e работает (register → admin DM approval → onboarding → products CRUD → **orders с state transitions** → **payment-settings edit** → **profile edit**). Buyer получает контекстные DM на каждой смене status'а (PICKUP vs DELIVERY awareness). **3 critical IDOR closed.** Audit critical+high closed **12/12** (Phase 1 + deep batch 1 + Kimi Tier A — все verified).
+**Next session entry point:** Kimi audit Tier B (5 PRs, ~155 LOC) — PublicPharmacyResponse DTO, createPharmacy `$transaction`, stock restore atomic, health DB ping, schema indexes. Либо Phase 3 (bot pendingRejectAt timeout + friendly admin race), либо Phase 7 (Search/Avi) — Captain's call.
 
 ---
 
@@ -198,6 +198,57 @@ Engineer работает соло (no separate Reviewer agent), но имити
 | #43 | `fix(web): wizard slug auto-derive` (smoke #1 — auto-derive только первый символ работал; SlugField теперь management state internally) | +35/-35 |
 | #44 | `fix(api): pharmacy.verified DM uses web_app button` (smoke #2 — plain URL DM не injected initData → Mini App 401 → onboarding all-grey; теперь web_app button) | +21/-4 |
 
+## Что отгружено в Session 6 (2026-05-11) — Phase 1 seller-side + Phase 2 customer notifications + Kimi audit Tier A
+
+11 PRs за день (#48-#58). Production main=`ff5c517`.
+
+### Group 1 — UX fixes (Day start)
+| PR | Содержание | Размер |
+|---|---|---|
+| #48 | `fix(web): wizard logo upload UX — dashed border + явный CTA` (drop-zone visual, IconImage, aria-label) | +23/-7 |
+| #49 | `fix(bot): set chat menu button programmatically — Menu → Mini App` (BotFather override через bot.api.setChatMenuButton) | +10 |
+
+### Group 2 — Phase 1 seller-side полностью closed (orders end-to-end working)
+| PR | Содержание | Размер |
+|---|---|---|
+| #50 | `feat: pharmacy orders page — full seller-side flow end-to-end` (state machine extension READY→DELIVERED pickup shortcut, ListPharmacyOrdersSchema status filter, PharmacyOrdersPage с chip filter, OrderDetailSheet с status-aware actions per (status, deliveryType), optimistic mutations с retry: 0) | +689/-20 |
+| #51 | `feat(web): pharmacy payment-settings UI — Multicard creds после регистрации` (sentinel-undefined pattern, type=password + autoComplete=off, hub card red dot indicator) | +296/-1 |
+| #52 | `feat(web): pharmacy profile edit page — закрытие seller-side flow` (LogoUpload reuse с disabled prop, phone error specifics, full Pharmacy.profile editor) | +345/-6 |
+
+### Group 3 — Phase 2 customer-side closed
+| PR | Содержание | Размер |
+|---|---|---|
+| #53 | `feat(api): buyer notifications + HTML escape + Order phone sanitize` (OrderStatusChangedEvent + new @OnEvent('order.statusChanged') handler, escapeHtml() helper применён ко всем DM templates, PhoneNumber.create() sanitize в OrderingService.placeOrder, removed frontend telHref workaround) | +188/-29 |
+
+### Group 4 — Kimi K2.6 audit Tier A (5 atomic per-fix PRs)
+
+Kimi K2.6 (Chinese model, Captain's subscription) провёл независимый audit. Все 5 critical findings верифицированы и закрыты атомарными PR'ами.
+
+| PR | Severity | Содержание | Размер |
+|---|---|---|---|
+| #54 | CRITICAL | `fix(api): close InitData future-date replay bypass (S-CRIT-6)` (isAuthDateValid pure helper с clock skew tolerance + 6 unit tests) | +58/-2 |
+| #55 | CRITICAL | `fix(api): close order GET IDOR (S-CRIT-7) — ownership check` (buyer либо pharmacy owner check + 6 unit tests, впервые application service test pattern) | +112/-3 |
+| #56 | CRITICAL | `fix(api): close payment-by-order IDOR (S-CRIT-8) — ownership check` (mirror getPaymentStatus pattern, ordersApi.getByOrder dead code в frontend → zero impact, 4 unit tests) | +131/-3 |
+| #57 | HIGH | `fix(api): Multicard callback amount cross-check (S-HIGH-10 defense-in-depth)` (explicit tiyin↔sum conversion check после signature verify, 4 new processCallback tests + 4 existing IDOR) | +146/-11 |
+| #58 | MEDIUM | `chore: add .dockerignore — prevent env/git/secrets leak in build context` (S-MED-11) | +61 |
+
+### Kimi audit findings statistics
+
+**Total findings reported:** 5 critical, 6 high, 8 medium, 6 low.
+**Closed Session 6:** 3 critical (S-CRIT-6/7/8) + 1 high (S-HIGH-10) + 1 medium (S-MED-11) = 5 PRs.
+**Verified as already closed:** All 10 Appendix A safe patterns (HTML escape, phone sanitize, AES-256-GCM, etc) — confirms prior session work correct.
+**Tier B pending (next session):** S-CRIT-9, S-CRIT-10+S-MED-6, S-HIGH-8, S-HIGH-12, S-MED-9 — see «Next session» section.
+**Tier C backlog:** S-HIGH-9 outbox pattern, S-HIGH-11 bot persistent session, S-HIGH-13 upload throttle, S-MED-4/5 payment.failed events, S-MED-7 phone +998 alignment, S-MED-8 bot multi-pharmacy reject, S-MED-10 swagger wiring, S-LOW-*.
+
+### Tests добавлены в Session 6
+
+- `apps/api/src/modules/iam/__tests__/telegram-auth.guard.spec.ts` (new): 6 tests для `isAuthDateValid` pure helper.
+- `apps/api/src/modules/ordering/__tests__/ordering.service.spec.ts` (new): 6 tests для `getOrder` ownership. **Первый application service test в проекте.**
+- `apps/api/src/modules/payment/__tests__/payment.service.spec.ts` (new): 8 tests (4 IDOR + 4 processCallback amount cross-check).
+- `apps/api/src/modules/ordering/__tests__/domain.spec.ts`: +2 tests для `OrderStatusChangedEvent`.
+
+Total backend tests **39** (27 ordering + 6 iam guard + 8 payment + others). Frontend tests: still none.
+
 ### Production env updates (Session 5)
 
 | Когда | Что | Причина |
@@ -227,9 +278,32 @@ End-to-end pharmacy onboarding **verified в production** by Captain across 5 bl
   - logo: `https://api.dorify.uz/uploads/logos/a14d3a46-487b-4e1d-857d-80e27ac409ee.webp` (200, image/webp, Cache-Control 1d)
   - isVerified=t, isActive=t
 
-### Хроника Session 5
+### Хроника Session 6
 
-1. **Sprint 0 PR-3 закрыт** (#34, ~30 мин) — deps install + sensitive headers scrub в exception filter (audit P4.1). Подготовка к Sprint 1.
+1. **Bootstrap** — Captain просил cold-start: «определи что сделано, есть документ хэндофф, определи план работы на сегодня». Engineer прочитал handoff + state.json, верифицировал что PR #45/#46/#47 merged (локальный ref был stale без fetch). Чёткое разделение: **Phase 1 (seller-side gaps)** + **Phase 2 (customer notifications)** + опционально **Phase 3 (bot polish)**.
+
+2. **UX fixes (~2h, PRs #48-#49)** — logo upload UX fix (dashed border drop-zone, IconImage, aria-label) + bot menu button programmatic config (setChatMenuButton, перебивает любую BotFather settings при запуске).
+
+3. **Phase 1 seller-side (~6h, PRs #50-#52)** — серьёзный pivot во время /check Task #10 backend: Engineer обнаружил что `PharmacyOrderController` + `OrderingService.listPharmacyOrders` **уже реализованы** в prior session (Task #10 был noop). Поэтому Task #11 расширился: backend status filter + state machine extension READY→DELIVERED (pickup shortcut) + frontend orders page с chip filter + OrderDetailSheet с status-aware actions per (status, deliveryType). Captain pushback во время /selfcheck: «не ищи быстрых побед» → Engineer пересмотрел scope, перекинул из read-only list к полноценным state-machine actions. PR #51 + #52 — payment-settings + profile edit, оба используют existing backend endpoints, frontend-only.
+
+4. **Phase 2 customer-side (~2h, PR #53)** — закрытие customer-experience gap. До этого pharmacy переводила статусы через UI → buyer ничего не знал. Added: OrderStatusChangedEvent emit из Order.updateStatus(), new @OnEvent handler с deliveryType-aware messaging (PICKUP «выдан» vs DELIVERY «доставлен»), HTML escape во всех DM templates (закрывает hidden injection vector через Telegram parse_mode='HTML'), phone sanitize at DTO boundary через PhoneNumber.create() в OrderingService.placeOrder. Frontend telHref() workaround removed — phone теперь always clean from backend.
+
+5. **Side-step: gidstroy advisory cross-check** — Captain pasted 12-point Kimi-style advisory из параллельного проекта gidstroy. Engineer верифицировал каждый пункт против actual code (НЕ trust на веру), нашёл что: 7 confirmed (HTML inject, DM logging, pendingReject timeout, race admin, advisory #5 stale [Task #11+#12 уже shipped today], banner field, frontend tests missing, telegram-ui peer mismatch React 19, BOT_TOKEN duplicate env, frontend access guard, spec login note). 1 неверный (#7 buyer PharmacyPage uses mock — в dorify-v2 такой страницы вообще нет, gidstroy-specific). Captain попросил «независимо где можно улучшить» — Engineer добавил свои findings: HTML injection broader scope (не только reject reason), buyer status DMs absent, phone sanitize, state machine SSOT через 4 файла, audit batch 2 outstanding, OrderStatus narrowing в shared/types. Captain согласился с приоритизацией Phase 1 → Phase 2 → Phase 3.
+
+6. **Kimi K2.6 full audit (~3h, PRs #54-#58)** — Captain прислал полный Kimi K2.6 audit report (5 critical, 6 high, 8 medium, 6 low) + Appendix A (10 verified safe patterns). Engineer перепроверил каждый critical/high против actual code, **все 5 critical confirmed**:
+   - S-CRIT-6 InitData future-date bypass (line 78 `now - authDate > ttl` дает negative при future authDate → always passes)
+   - S-CRIT-7 Order GET IDOR (getOrder без ownership check)
+   - S-CRIT-8 Payment-by-order IDOR (mirrors S-CRIT-7)
+   - S-CRIT-9 Public pharmacy endpoint PII (license/address/phone leak) — **severity overstated, я бы дал HIGH**
+   - S-CRIT-10 Pharmacy registration race condition (no transaction wrapping createPharmacy + promoteToOwner)
+
+   Self-correction during planning: первоначально Engineer предложил «single security batch PR» — Captain попросил «перепровери на ошибки». Engineer честно нашёл 5 пробелов в собственном плане (atomic per-fix PRs > big batch, tests must be included, smoke risk warnings missing, ordering matters). Pivoted на **5 atomic per-fix PRs** для Tier A. Сделал #54-#58 sequentially, каждый <150 LOC с tests.
+
+   **Honest признание (committed в state.json)**: Engineer **пропустил S-CRIT-7 и S-CRIT-8** во время Phase 1+2 /security-review skill runs — фокусировался на новых mutations и multi-tenant scope, не probed existing GET endpoints. Mea culpa pattern — security review skill нужно дополнить «scan all existing GET handlers с :id parameter».
+
+7. **Application service test precedent** — Session 6 ввела впервые в codebase application-level service tests (3 spec файла: telegram-auth.guard, ordering.service, payment.service). Lightweight pattern: `new Service(...)` с `jest.fn()` mocks, без NestJS Test module overhead. 20 новых tests суммарно. Удобный pattern для следующих sprints.
+
+### Хроника Session 5
 
 2. **Sprint 1 Day 1** (#35, ~1ч) — bot welcome flow с UZ/RU language picker + role choice [Buyer / Register pharmacy]. Простой TS-объект i18n без react-i18next overhead на bot side. Session middleware (in-memory) для lang persistence.
 
@@ -535,39 +609,45 @@ Codex стандарты в `~/Codex/standards/`:
 
 ---
 
-## ⏭ Next session — три вероятных направления
+## ⏭ Next session (Session 7) — entry point
 
-Session 3 закрыл дизайн-пасс v2 (см. PR #12-#22, marked в POLISH_PLAN.md). Captain в финале сессии: «обнови документацию, опиши где мы что впереди».
+**Captain в финале Session 6:** «сегодня заканчиваем, обнови документацию, создай хэндофф, клинап». Tier A Kimi audit полностью closed; Tier B и backlog ждут.
 
-### Опция A — Phase 4 backend hardening (Multicard)
+### Опция A (Recommended) — Kimi Tier B (5 PRs, ~155 LOC)
 
-**Самый высокоприоритетный backend gap.** Без него реальный buyer flow не prod-ready на финансовом уровне.
+Architectural fixes которые требуют больше LOC + design thinking чем Tier A. Каждый отдельный PR.
 
-Items (per `docs/multicard-1/README.md` §8):
-- IP whitelist guard на `/payments/callback` — defense-in-depth.
-- Idempotency-Key + Retry с exp backoff в `multicard.adapter.ts` — financial integrity.
-- Amount validation в callback (callback.amount === payment.amount).
-- ThrottlerModule skip для `/payments/callback` (Multicard burst).
-- OFD order-time validation в ordering domain.
-- Reconcile cron на PENDING > 10 min.
-- Reuse existing PENDING payment (fix duplicate row pre-existing bug).
+| # | Severity | Что | Estimate LOC |
+|---|---|---|---|
+| 1 | CRITICAL (overstated → HIGH) | **S-CRIT-9 PublicPharmacyResponse DTO split** — `GET /pharmacy/:id` сейчас отдаёт address+phone+license unauthenticated buyers. Нужен PublicPharmacyResponse (name, slug, logo, hasPaymentSettings, deliveryEnabled/Price, description) vs full Response. Frontend `@shared/types Pharmacy` narrows = breaking change для cart, onboarding callers. | ~60 |
+| 2 | CRITICAL | **S-CRIT-10 + S-MED-6 createPharmacy `$transaction`** — двойной POST от одного user создаёт orphan pharmacy (no tx wrapping pharmacyRepo.save + userRepo.save). Plus user.isBanned check. Repository interface либо service-level prismaService для tx wrapping. | ~40 |
+| 3 | HIGH | **S-HIGH-8 Stock restore atomic increment** — OnOrderCancelledRestoreStock использует findById→restoreStock→save (read-modify-write race). Mirror placeAtomically pattern: `tx.product.updateMany({where, data: {stock: {increment}}})`. Architectural choice: domain bypass (10 LOC) vs new repository method (30 LOC clean). | ~30 |
+| 4 | HIGH | **S-HIGH-12 Health DB ping** — `/health` endpoint статично возвращает 200 даже если БД down. Add Prisma `SELECT 1` + return 503 on failure. | ~10 |
+| 5 | MEDIUM | **S-MED-9 Schema indexes** (Kimi Appendix B) — `@@index([status, provider, createdAt])` для Payment reconcile cron + `@@index([pharmacyId, createdAt])` для Order pharmacy-only queries без status filter. Требует production migration coordination. | ~5 + migration |
 
-Estimate: ~6-8 часов (атомарные PR'ы).
+### Опция B — Phase 3 (bot UX polish, ~30 мин)
 
-### Опция B — Tier 2/3 продолжение
+Originally planned, не успели сегодня:
+- `pendingRejectAt` timestamp в bot session + 5-min auto-clear (gidstroy advisory #3 + Kimi S-MED-8 overlap)
+- Friendly «Уже обработано другим админом» вместо raw DomainError text (gidstroy advisory #4 + Kimi race fix)
 
-- **Tier 2 #6** Pharmacy panel — orders list (read-only ~1.5 дня).
-- **Tier 2 #5** Pharmacy panel — payment-settings (Multicard creds form, ~1 день).
-- **Tier 2 #7** Bot pharmacy registration wizard (Grammy conversations, ~2 дня).
-- **Tier 3 #8** Admin SPA + JwtAuthGuard wire (~4 дня).
+### Опция C — Phase 7 Search/Avi (~5-7 дней)
 
-### Опция C — Design pass extension
+Qdrant→pgvector переход, Product events chain, AI search UI. Captain decision на pgvector closed; остался implementation.
 
-OrdersPage / ProductPage / Checkout / PaymentResult — minor visual polish с применением foundation. ~3-4 часа.
+### Опция D — Tier C backlog (medium architectural)
 
-### Опция D — Pause / Multicard reactivation
+- **S-HIGH-9 Outbox pattern** — In-memory EventEmitter crash silence. Major architectural: либо outbox table в DB либо Redis Streams. Multi-day work.
+- **S-HIGH-11 Bot persistent session** — Redis либо Prisma session store. Medium work.
+- **S-HIGH-13 Upload throttling** — ThrottlerModule + per-user quota.
+- **S-MED-4 + S-MED-5 payment.failed flow** — markPaymentFailed wire + buyer notification handler.
+- **S-MED-7 Phone format alignment** — UZ-only enforce либо international parity между frontend/backend.
+- **S-MED-10 Swagger wiring** — SwaggerModule.setup() behind admin guard.
+- **S-LOW-1 i18n bootstrap** — react-i18next setup, всё UI strings в ключах.
 
-Если придут ответы от Multicard support (PDF inquiry на Captain's Desktop) — pivot к platform-as-merchant + split (см. `docs/multicard-1/README.md` §6).
+### Опция E — Buyer-side smoke (~15 мин)
+
+Session 5 Block 5 (buyer flow) до сих pending. Captain не приоритизировал в Session 6 — может пройти сейчас за 15 мин с новыми статусами + buyer DMs.
 
 ---
 

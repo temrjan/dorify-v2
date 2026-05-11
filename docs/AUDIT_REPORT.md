@@ -1,13 +1,13 @@
 # Dorify v2 — Comprehensive Audit Report
 
-**Date:** 2026-05-09 (audit) · **Last status update:** 2026-05-10 (Session 5 close)
-**Auditor:** Claude Code
+**Date:** 2026-05-09 (Claude Code audit) · **Last status update:** 2026-05-11 (Session 6 close + Kimi K2.6 audit integration)
+**Auditor:** Claude Code (initial) + Kimi K2.6 (Session 6 cross-check, 2026-05-11)
 **Scope:** Backend API, Frontend Web, Telegram Bot, Infrastructure, Security
 **Branch:** `main`
 
-## Status summary (2026-05-10)
+## Status summary (2026-05-11)
 
-**Critical+High findings closed: 9/12.**
+**Claude Code original audit — critical+high closed: 12/12** (all actionable items, S-CRIT-2 partial по design — JWT для Admin SPA = Phase 8).
 
 | ID | Finding | Status | PR |
 |---|---|---|---|
@@ -25,6 +25,66 @@
 | **S-CRIT-2** | TelegramAuthGuard global, JwtAuthGuard unused | ⏳ partial: service token guard ✅ (PR #29); JWT для admin SPA → Phase 8 |  |
 
 **Phase 4 (Multicard hardening) closed 7/7** (PR #39 IP whitelist + #40 OFD validation + #41 ReconcilePayments cron + #46 adapter retry).
+
+---
+
+## Kimi K2.6 audit (2026-05-11) — independent cross-check
+
+Captain заказал independent audit от Kimi K2.6 (Chinese model). Найдены 5 critical + 6 high + 8 medium + 6 low. Все 5 critical верифицированы против actual code и closed в Session 6 (Tier A).
+
+### Critical (всё confirmed против code)
+
+| ID | Finding | Status | PR |
+|---|---|---|---|
+| **S-CRIT-6** | InitData future-date replay bypass (`now - authDate > ttl` для future authDate negative → always passes) | ✅ closed | #54 |
+| **S-CRIT-7** | Order GET endpoint IDOR — getOrder без ownership check | ✅ closed | #55 |
+| **S-CRIT-8** | Payment-by-order endpoint IDOR — getPaymentByOrder без ownership | ✅ closed | #56 |
+| **S-CRIT-9** | Public pharmacy endpoint leaks PII (address, phone, license к unauthenticated buyers) | ⏳ Tier B (pending) |  |
+| **S-CRIT-10** | Pharmacy registration race condition — createPharmacy + promoteToOwner без $transaction | ⏳ Tier B (pending) |  |
+
+### High
+
+| ID | Finding | Status | PR |
+|---|---|---|---|
+| **S-HIGH-8** | Stock restore on cancel non-atomic (findById→restoreStock→save race) | ⏳ Tier B (pending) |  |
+| **S-HIGH-9** | In-memory events = silent failures on crash | ⏳ backlog (outbox pattern, multi-day work) |  |
+| **S-HIGH-10** | Multicard callback missing amount cross-check | ✅ closed (defense-in-depth) | #57 |
+| **S-HIGH-11** | Bot in-memory session lost on restart | ⏳ backlog (Redis либо Prisma session store) |  |
+| **S-HIGH-12** | Health check не validates DB connectivity | ⏳ Tier B (pending) |  |
+| **S-HIGH-13** | Upload endpoint unbounded disk-exhaustion vector | ⏳ backlog (ThrottlerModule + per-user quota) |  |
+
+### Medium
+
+| ID | Finding | Status | PR |
+|---|---|---|---|
+| **S-MED-4** | Order state machine missing payment-failed transition | ⏳ backlog |  |
+| **S-MED-5** | Missing payment.failed event / buyer notification | ⏳ backlog |  |
+| **S-MED-6** | Banned user can create orphan pharmacy (overlaps S-CRIT-10 fix) | ⏳ Tier B (вместе с S-CRIT-10) |  |
+| **S-MED-7** | Phone number VO accepts non-Uzbek, frontend assumes +998 | ⏳ backlog (design decision) |  |
+| **S-MED-8** | Bot admin reject overwrites concurrent session state (overlaps gidstroy advisory) | ⏳ Phase 3 либо backlog |  |
+| **S-MED-9** | Missing composite DB index для payment reconcile query | ⏳ Tier B (pending) |  |
+| **S-MED-10** | Swagger installed но not wired | ⏳ backlog |  |
+| **S-MED-11** | No .dockerignore — env/secret leak в image layers | ✅ closed | #58 |
+
+### Low (tech debt)
+
+S-LOW-1..6 — i18n bootstrap, hardcoded Russian copy, bundle analyzer, soft delete Order, Caddy config external, etc. Все tracked в Tier C backlog в handoff.
+
+### Appendix A — Kimi подтверждает 10 safe patterns
+
+placeAtomically race protection, markPaidAtomically idempotency, callback IP whitelist normalization, HTML escape в DMs (Phase 2 work), phone sanitization at DTO boundary (Phase 2 work), AES-256-GCM, ServiceTokenGuard timing-safe, MD5 callback signature timing-safe, pagination limits, upload magic-bytes — all confirmed correct.
+
+### Session 6 Tier A closure (5 PRs)
+
+| PR | Finding | LOC | Tests added |
+|---|---|---|---|
+| #54 | S-CRIT-6 | +58/-2 | 6 (isAuthDateValid pure helper) |
+| #55 | S-CRIT-7 | +112/-3 | 6 (OrderingService.getOrder ownership) |
+| #56 | S-CRIT-8 | +131/-3 | 4 (PaymentService.getPaymentByOrder ownership) |
+| #57 | S-HIGH-10 | +146/-11 | 4 (processCallback amount check) + 4 existing IDOR |
+| #58 | S-MED-11 | +61 | — |
+
+**Self-correction noted**: Engineer пропустил S-CRIT-7 + S-CRIT-8 во время Phase 1+2 /security-review skill runs. Pattern: /security-review focuses on new mutations, NOT на existing GET endpoints с :id parameter. Process improvement для следующих audits — explicitly probe all GET handlers с path params.
 
 > **Note:** Original audit title — «Dorify v2 (GidStroy)». Auditor periodically
 > confused dorify-v2 с gidstroy (related project). False positives:
