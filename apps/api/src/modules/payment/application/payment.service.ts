@@ -158,7 +158,20 @@ export class PaymentService {
     return this.toResponse(payment);
   }
 
-  async getPaymentByOrder(orderId: string): Promise<PaymentResponse | undefined> {
+  async getPaymentByOrder(orderId: string, userId: string): Promise<PaymentResponse | undefined> {
+    // Ownership check (closes S-CRIT-8 IDOR). Прежний `getPaymentByOrder(orderId)`
+    // без проверки позволял любому авторизованному user'у читать payment
+    // status, checkoutUrl, receiptUrl любого заказа. PaymentResponse содержит
+    // sensitive поля для PDPL (transactionId / cardPan stored — currently не
+    // returned, но receiptUrl даёт callback access).
+    const order = await this.orderRepo.findById(orderId);
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Payment does not belong to you');
+    }
+
     const payment = await this.paymentRepo.findByOrderId(orderId);
     return payment ? this.toResponse(payment) : undefined;
   }
