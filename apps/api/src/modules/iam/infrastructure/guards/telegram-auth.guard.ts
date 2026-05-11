@@ -18,6 +18,28 @@ interface TelegramUserData {
   language_code?: string;
 }
 
+/** Tolerance for clock skew between Telegram server и наш host. */
+const ALLOWED_CLOCK_SKEW_SECONDS = 5;
+
+/**
+ * Validate `auth_date` timestamp.
+ *
+ * Closes S-CRIT-6 (replay bypass): прошлая логика `now - authDate > ttl` для
+ * authDate из будущего давала отрицательный результат, который ВСЕГДА < ttl →
+ * проверка проходила, replay window практически неограничен. Attacker мог
+ * фабриковать initData с auth_date = now + 86400 и оставаться валидным сутки
+ * (требует HMAC, т.е. BOT_TOKEN leak либо capture+replay actual valid token —
+ * но даже actual capture даёт only ttl-second window, future-date trick расширяет
+ * до unlimited).
+ *
+ * Pure function для unit-testability.
+ */
+export function isAuthDateValid(authDate: number, now: number, ttlSeconds: number): boolean {
+  if (authDate > now + ALLOWED_CLOCK_SKEW_SECONDS) return false;
+  if (now - authDate > ttlSeconds) return false;
+  return true;
+}
+
 @Injectable()
 export class TelegramAuthGuard implements CanActivate {
   private readonly logger = new Logger(TelegramAuthGuard.name);
@@ -75,8 +97,10 @@ export class TelegramAuthGuard implements CanActivate {
       if (!authDate) return undefined;
 
       const now = Math.floor(Date.now() / 1000);
-      if (now - authDate > config.INIT_DATA_TTL_SECONDS) {
-        this.logger.warn('Telegram initData expired');
+      if (!isAuthDateValid(authDate, now, config.INIT_DATA_TTL_SECONDS)) {
+        this.logger.warn(
+          `Telegram initData rejected (auth_date=${authDate}, now=${now}, ttl=${config.INIT_DATA_TTL_SECONDS})`,
+        );
         return undefined;
       }
 
