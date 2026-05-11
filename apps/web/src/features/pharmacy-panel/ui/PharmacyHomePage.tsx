@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Text } from '@telegram-apps/telegram-ui';
 import type { ComponentType, SVGProps } from 'react';
 import { pharmacyOrdersApi } from '@shared/api/pharmacyOrders';
+import { pharmaciesApi } from '@shared/api/pharmacies';
 import {
   IconCard,
   IconChevronRight,
@@ -73,6 +74,15 @@ export function PharmacyHomePage() {
   });
   const hasNewRequests = (newRequestsProbe?.total ?? 0) > 0;
 
+  // Pharmacy profile — для indicator на «Настройки оплаты» card. Используем
+  // hasPaymentSettings flag из существующего endpoint.
+  const { data: profile } = useQuery({
+    queryKey: ['pharmacy-profile'],
+    queryFn: () => pharmaciesApi.getProfile(),
+    staleTime: 60_000,
+  });
+  const needsPaymentSetup = profile !== undefined && !profile.hasPaymentSettings;
+
   return (
     <div className="px-4 pt-4 pb-8">
       <Text className="text-2xl font-bold block">Панель аптеки</Text>
@@ -98,7 +108,8 @@ export function PharmacyHomePage() {
           title="Настройки оплаты"
           description="Multicard и реквизиты"
           Icon={IconCard}
-          disabled
+          to="payment-settings"
+          indicator={needsPaymentSetup}
         />
         <NavCard
           title="Профиль аптеки"
