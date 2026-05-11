@@ -32,6 +32,16 @@ async function main(): Promise<void> {
     { command: 'help', description: 'Справка / Yordam' },
   ]);
 
+  // Set default chat menu button — overrides any @BotFather setting.
+  // Programmatic ensures consistent UX across deploys.
+  await bot.api.setChatMenuButton({
+    menu_button: {
+      type: 'web_app',
+      text: 'Menu',
+      web_app: { url: config.WEBAPP_URL },
+    },
+  });
+
   // Health check HTTP server
   const healthApp = express();
   healthApp.get('/health', (_req, res) => {
