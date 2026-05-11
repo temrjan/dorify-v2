@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Button, Text } from '@telegram-apps/telegram-ui';
 import { becomePharmacyApi } from '../api';
-import { IconAlert, IconStore } from '@shared/ui/icons';
+import { IconAlert, IconImage } from '@shared/ui/icons';
 
 interface LogoUploadProps {
   value: string;
@@ -53,7 +53,7 @@ export function LogoUpload({ value, onChange }: LogoUploadProps) {
 
   return (
     <div>
-      <label className="text-xs text-tg-hint block mb-1">Логотип</label>
+      <label className="text-xs text-tg-hint block mb-1">Логотип аптеки</label>
 
       <input
         ref={inputRef}
@@ -90,13 +90,19 @@ export function LogoUpload({ value, onChange }: LogoUploadProps) {
           type="button"
           onClick={handlePick}
           disabled={uploading}
-          className="w-full bg-tg-secondary rounded-card p-6 flex flex-col items-center gap-2 transition active:scale-[0.99] disabled:opacity-60"
+          aria-label="Загрузить логотип"
+          aria-busy={uploading}
+          className="w-full border-2 border-dashed border-tg-hint/30 hover:border-tg-hint/60 rounded-card py-8 px-4 flex flex-col items-center gap-2 transition active:scale-[0.99] disabled:opacity-60"
         >
-          <IconStore width={32} height={32} className="text-tg-hint" />
-          <Text className="text-sm font-medium">
-            {uploading ? 'Загружаем...' : 'Выбрать файл'}
+          <span className="w-14 h-14 rounded-full bg-tg-section flex items-center justify-center">
+            <IconImage width={28} height={28} className="text-tg-hint" />
+          </span>
+          <Text className="text-base font-semibold">
+            {uploading ? 'Загружаем...' : 'Загрузить логотип'}
           </Text>
-          <Text className="text-xs text-tg-hint">JPEG / PNG / WebP, до 5 МБ</Text>
+          <Text className="text-xs text-tg-hint text-center">
+            Покажется покупателям в каталоге · JPEG / PNG / WebP до 5 МБ
+          </Text>
         </button>
       )}
 
