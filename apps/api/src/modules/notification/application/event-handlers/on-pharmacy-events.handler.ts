@@ -1,7 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { config } from '@core/config/env.config';
-import { TelegramNotifierService } from '../../infrastructure/telegram-notifier.service';
+import { TelegramNotifierService, escapeHtml } from '../../infrastructure/telegram-notifier.service';
 import { USER_REPOSITORY } from '../../../iam/domain/repositories/user.repository';
 import type { UserRepository } from '../../../iam/domain/repositories/user.repository';
 import type {
@@ -37,12 +37,14 @@ export class PharmacyNotificationHandler {
     }
 
     const owner = await this.userRepo.findById(ownerId);
-    const ownerLine = owner ? `@${owner.username ?? owner.firstName}` : ownerId;
+    const ownerLine = owner
+      ? `@${escapeHtml(owner.username ?? owner.firstName ?? '')}`
+      : escapeHtml(ownerId);
 
     const text =
       `🏪 <b>Новая заявка на регистрацию аптеки</b>\n\n` +
-      `<b>${name}</b>\n` +
-      `URL: <code>${slug}</code>\n` +
+      `<b>${escapeHtml(name)}</b>\n` +
+      `URL: <code>${escapeHtml(slug)}</code>\n` +
       `Владелец: ${ownerLine}\n\n` +
       `Проверьте данные и одобрите либо отклоните.`;
 
@@ -68,7 +70,7 @@ export class PharmacyNotificationHandler {
     await this.notifier.sendMessage(
       owner.telegramId.toString(),
       `✅ <b>Аптека одобрена</b>\n\n` +
-        `<b>${event.payload.name}</b> прошла модерацию. Откройте панель чтобы добавить товары.`,
+        `<b>${escapeHtml(event.payload.name)}</b> прошла модерацию. Откройте панель чтобы добавить товары.`,
       {
         inlineKeyboard: [
           [
@@ -91,7 +93,7 @@ export class PharmacyNotificationHandler {
     await this.notifier.sendMessage(
       owner.telegramId.toString(),
       `❌ <b>Заявка отклонена</b>\n\n` +
-        `Причина: ${event.payload.reason}\n\n` +
+        `Причина: ${escapeHtml(event.payload.reason)}\n\n` +
         `Вы можете подать заявку повторно с обновлёнными данными.`,
     );
   }

@@ -19,6 +19,17 @@ export interface SendMessageOptions {
   inlineKeyboard?: InlineButton[][];
 }
 
+/**
+ * Escape user-controlled strings before interpolating в HTML-formatted DMs.
+ * Telegram parse_mode='HTML' supports limited tag set (b/i/code/etc); any raw
+ * `&<>` в user input ломают rendering либо валит Telegram API на 400.
+ * Применять на ВСЕ user-input fields: admin reason, buyer phone, pharmacy name,
+ * product names, etc.
+ */
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 @Injectable()
 export class TelegramNotifierService {
   private readonly logger = new Logger(TelegramNotifierService.name);

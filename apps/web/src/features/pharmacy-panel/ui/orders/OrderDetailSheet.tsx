@@ -43,12 +43,6 @@ function formatMoney(amount: number): string {
   return new Intl.NumberFormat('uz-UZ').format(amount);
 }
 
-// Backend stores contactPhone as user-entered (may contain spaces/dashes).
-// tel: URI scheme requires no whitespace — sanitize for href, keep raw for display.
-function telHref(phone: string): string {
-  return 'tel:' + phone.replace(/[\s\-()]/g, '');
-}
-
 export function OrderDetailSheet({ order, onClose }: OrderDetailSheetProps) {
   const queryClient = useQueryClient();
   const [showCancelForm, setShowCancelForm] = useState(false);
@@ -195,7 +189,7 @@ export function OrderDetailSheet({ order, onClose }: OrderDetailSheetProps) {
           <div>
             <Text className="text-xs text-tg-hint block">Покупатель</Text>
             <a
-              href={telHref(order.contactPhone)}
+              href={`tel:${order.contactPhone}`}
               className="text-sm text-dorify-primary underline"
             >
               {order.contactPhone}

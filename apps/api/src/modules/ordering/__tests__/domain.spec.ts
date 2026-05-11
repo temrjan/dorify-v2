@@ -4,6 +4,7 @@ import { Money } from '../../catalog/domain/value-objects/money.vo';
 import { OrderCreatedEvent } from '../domain/events/order-created.event';
 import { OrderConfirmedEvent } from '../domain/events/order-confirmed.event';
 import { OrderCancelledEvent } from '../domain/events/order-cancelled.event';
+import { OrderStatusChangedEvent } from '../domain/events/order-status-changed.event';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -176,6 +177,37 @@ describe('Order', () => {
     // Pickup: pharmacy hands order directly to buyer — no courier step.
     order.updateStatus(OrderStatus.DELIVERED);
     expect(order.status).toBe(OrderStatus.DELIVERED);
+  });
+
+  it('should emit OrderStatusChangedEvent on each updateStatus transition', () => {
+    const order = createOrder();
+    order.confirm();
+    order.pullDomainEvents(); // clear creation + confirm events
+
+    order.updateStatus(OrderStatus.PREPARING);
+    const events = order.pullDomainEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toBeInstanceOf(OrderStatusChangedEvent);
+
+    const evt = events[0] as OrderStatusChangedEvent;
+    expect(evt.payload.from).toBe(OrderStatus.CONFIRMED);
+    expect(evt.payload.to).toBe(OrderStatus.PREPARING);
+    expect(evt.payload.orderId).toBe('order-1');
+    expect(evt.payload.deliveryType).toBe('PICKUP');
+  });
+
+  it('should NOT emit OrderStatusChangedEvent from confirm() либо cancel()', () => {
+    // confirm() emits OrderConfirmedEvent, cancel() emits OrderCancelledEvent.
+    // Они отдельные events для backward compat и payment-status semantics.
+    const order = createOrder();
+    order.confirm();
+    const events = order.pullDomainEvents();
+    expect(events.some((e) => e instanceof OrderStatusChangedEvent)).toBe(false);
+
+    const order2 = createOrder();
+    order2.cancel('test');
+    const events2 = order2.pullDomainEvents();
+    expect(events2.some((e) => e instanceof OrderStatusChangedEvent)).toBe(false);
   });
 
   it('should reject invalid transition PENDING → DELIVERED', () => {
