@@ -16,12 +16,25 @@ export interface UpdatePaymentSettingsPayload {
   multicardSecret: string;
 }
 
+export interface UpdateProfilePayload {
+  name?: string;
+  description?: string;
+  address?: string;
+  phone?: string;
+  logo?: string;
+  deliveryEnabled?: boolean;
+  deliveryPrice?: number;
+}
+
 export const pharmaciesApi = {
   getById: (id: string) =>
     apiClient.get<Pharmacy>(`/pharmacy/${id}`).then((r) => r.data),
 
   getProfile: () =>
     apiClient.get<Pharmacy>('/pharmacy/profile').then((r) => r.data),
+
+  updateProfile: (payload: UpdateProfilePayload) =>
+    apiClient.put<Pharmacy>('/pharmacy/profile', payload).then((r) => r.data),
 
   getPaymentSettings: () =>
     apiClient.get<PaymentSettings>('/pharmacy/payment-settings').then((r) => r.data),
