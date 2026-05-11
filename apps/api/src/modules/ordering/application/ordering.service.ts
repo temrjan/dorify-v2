@@ -191,10 +191,24 @@ export class OrderingService {
     return this.toResponse(order);
   }
 
-  async getOrder(orderId: string): Promise<OrderResponse> {
+  async getOrder(
+    orderId: string,
+    userId: string,
+    userPharmacyId?: string,
+  ): Promise<OrderResponse> {
     const order = await this.orderRepo.findById(orderId);
     if (!order) {
       throw new NotFoundException(`Order ${orderId} not found`);
+    }
+    // Ownership check (closes S-CRIT-7 IDOR). Прежний `getOrder(orderId)` БЕЗ
+    // ownership check позволял любому авторизованному user'у с валидным cuid
+    // читать buyerId, contactPhone, deliveryAddress, comment, items любого
+    // заказа. Cuid не enumerable, но если ID утёк (URL share, screenshot,
+    // referer, logs) — доступ открывался.
+    const isBuyer = order.buyerId === userId;
+    const isPharmacyOwner = userPharmacyId !== undefined && order.pharmacyId === userPharmacyId;
+    if (!isBuyer && !isPharmacyOwner) {
+      throw new ForbiddenException('You do not have access to this order');
     }
     return this.toResponse(order);
   }
