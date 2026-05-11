@@ -1,4 +1,4 @@
-import type { Order } from '../entities/order.entity';
+import type { Order, OrderStatus } from '../entities/order.entity';
 import type { PaginatedResult, PaginationDto } from '@common/dto/pagination.dto';
 
 export class InsufficientStockError extends Error {
@@ -11,7 +11,11 @@ export class InsufficientStockError extends Error {
 export interface OrderRepository {
   findById(id: string): Promise<Order | undefined>;
   findByBuyerId(buyerId: string, pagination: PaginationDto): Promise<PaginatedResult<Order>>;
-  findByPharmacyId(pharmacyId: string, pagination: PaginationDto): Promise<PaginatedResult<Order>>;
+  findByPharmacyId(
+    pharmacyId: string,
+    pagination: PaginationDto,
+    status?: OrderStatus,
+  ): Promise<PaginatedResult<Order>>;
   save(order: Order): Promise<void>;
 
   /**

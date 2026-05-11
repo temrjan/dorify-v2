@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Text } from '@telegram-apps/telegram-ui';
 import type { ComponentType, SVGProps } from 'react';
+import { pharmacyOrdersApi } from '@shared/api/pharmacyOrders';
 import {
   IconCard,
   IconChevronRight,
@@ -15,9 +17,11 @@ interface NavCardProps {
   Icon: ComponentType<SVGProps<SVGSVGElement>>;
   to?: string;
   disabled?: boolean;
+  /** Red dot indicator показывается рядом с заголовком — без числа, v1. */
+  indicator?: boolean;
 }
 
-function NavCard({ title, description, Icon, to, disabled }: NavCardProps) {
+function NavCard({ title, description, Icon, to, disabled, indicator }: NavCardProps) {
   const navigate = useNavigate();
   return (
     <button
@@ -38,6 +42,12 @@ function NavCard({ title, description, Icon, to, disabled }: NavCardProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <Text className="font-medium block">{title}</Text>
+          {indicator && (
+            <span
+              className="w-2 h-2 rounded-full bg-dorify-error"
+              aria-label="Есть новые"
+            />
+          )}
           {disabled && (
             <span className="text-[10px] uppercase tracking-wider text-tg-hint bg-tg-secondary px-1.5 py-0.5 rounded">
               скоро
@@ -54,6 +64,15 @@ function NavCard({ title, description, Icon, to, disabled }: NavCardProps) {
 }
 
 export function PharmacyHomePage() {
+  // Cheap presence check — limit=1 даёт boolean "is there any new заявка?".
+  // Stats endpoint с counts — отдельный PR (v2 follow-up).
+  const { data: newRequestsProbe } = useQuery({
+    queryKey: ['pharmacy-orders', 'has-pending-manual'],
+    queryFn: () =>
+      pharmacyOrdersApi.list({ page: 1, limit: 1, status: 'PENDING_MANUAL_CONTACT' }),
+  });
+  const hasNewRequests = (newRequestsProbe?.total ?? 0) > 0;
+
   return (
     <div className="px-4 pt-4 pb-8">
       <Text className="text-2xl font-bold block">Панель аптеки</Text>
@@ -72,7 +91,8 @@ export function PharmacyHomePage() {
           title="Заказы"
           description="Управление заказами покупателей"
           Icon={IconOrders}
-          disabled
+          to="orders"
+          indicator={hasNewRequests}
         />
         <NavCard
           title="Настройки оплаты"

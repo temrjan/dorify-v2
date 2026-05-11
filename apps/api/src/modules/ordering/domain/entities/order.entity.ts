@@ -34,7 +34,9 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING_MANUAL_CONTACT]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
   [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
   [OrderStatus.PREPARING]: [OrderStatus.READY],
-  [OrderStatus.READY]: [OrderStatus.DELIVERING],
+  // Pickup orders: READY → DELIVERED одним шагом (no fake DELIVERING step
+  // когда курьера нет). Delivery orders: READY → DELIVERING → DELIVERED.
+  [OrderStatus.READY]: [OrderStatus.DELIVERING, OrderStatus.DELIVERED],
   [OrderStatus.DELIVERING]: [OrderStatus.DELIVERED],
   [OrderStatus.DELIVERED]: [],
   [OrderStatus.CANCELLED]: [],
