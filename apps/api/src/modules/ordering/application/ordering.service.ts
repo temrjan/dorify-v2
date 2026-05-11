@@ -192,8 +192,12 @@ export class OrderingService {
     };
   }
 
-  async listPharmacyOrders(pharmacyId: string, pagination: PaginationDto): Promise<PaginatedResult<OrderResponse>> {
-    const result = await this.orderRepo.findByPharmacyId(pharmacyId, pagination);
+  async listPharmacyOrders(
+    pharmacyId: string,
+    pagination: PaginationDto,
+    status?: OrderStatus,
+  ): Promise<PaginatedResult<OrderResponse>> {
+    const result = await this.orderRepo.findByPharmacyId(pharmacyId, pagination, status);
     return {
       ...result,
       items: result.items.map((o) => this.toResponse(o)),

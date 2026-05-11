@@ -37,14 +37,28 @@ export interface OrderItem {
   subtotal: number;
 }
 
+export type OrderStatus =
+  | 'PENDING'
+  | 'PENDING_MANUAL_CONTACT'
+  | 'CONFIRMED'
+  | 'PREPARING'
+  | 'READY'
+  | 'DELIVERING'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
+export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'EXPIRED';
+
+export type DeliveryType = 'PICKUP' | 'DELIVERY';
+
 export interface Order {
   id: string;
   pharmacyId: string;
   buyerId: string;
-  status: string;
-  paymentStatus: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
   totalAmount: number;
-  deliveryType: string;
+  deliveryType: DeliveryType;
   deliveryAddress?: string;
   contactPhone: string;
   comment?: string;

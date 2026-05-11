@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PaginationSchema } from '@common/dto/pagination.dto';
 
 export const PlaceOrderSchema = z.object({
   pharmacyId: z.string().min(1),
@@ -14,10 +15,34 @@ export const PlaceOrderSchema = z.object({
 
 export type PlaceOrderDto = z.infer<typeof PlaceOrderSchema>;
 
-export const UpdateOrderStatusSchema = z.object({
-  status: z.enum(['CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'DELIVERED', 'CANCELLED']),
-  reason: z.string().max(500).optional(),
+const ORDER_STATUS_VALUES = [
+  'PENDING',
+  'PENDING_MANUAL_CONTACT',
+  'CONFIRMED',
+  'PREPARING',
+  'READY',
+  'DELIVERING',
+  'DELIVERED',
+  'CANCELLED',
+] as const;
+
+export const ListPharmacyOrdersSchema = PaginationSchema.extend({
+  status: z.enum(ORDER_STATUS_VALUES).optional(),
 });
+
+export type ListPharmacyOrdersDto = z.infer<typeof ListPharmacyOrdersSchema>;
+
+// Cancel requires non-empty reason (audit trail). Forward transitions don't
+// need reason. Refinement enforces server-side, не only client-side.
+export const UpdateOrderStatusSchema = z
+  .object({
+    status: z.enum(['CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'DELIVERED', 'CANCELLED']),
+    reason: z.string().max(500).optional(),
+  })
+  .refine(
+    (data) => data.status !== 'CANCELLED' || (typeof data.reason === 'string' && data.reason.trim().length > 0),
+    { message: 'Reason is required when cancelling', path: ['reason'] },
+  );
 
 export type UpdateOrderStatusDto = z.infer<typeof UpdateOrderStatusSchema>;
 

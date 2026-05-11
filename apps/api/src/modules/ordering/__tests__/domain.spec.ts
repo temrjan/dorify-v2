@@ -167,6 +167,17 @@ describe('Order', () => {
     expect(order.status).toBe(OrderStatus.DELIVERED);
   });
 
+  it('should support pickup shortcut: READY → DELIVERED (no fake DELIVERING)', () => {
+    const order = createOrder();
+    order.confirm();
+    order.updateStatus(OrderStatus.PREPARING);
+    order.updateStatus(OrderStatus.READY);
+
+    // Pickup: pharmacy hands order directly to buyer — no courier step.
+    order.updateStatus(OrderStatus.DELIVERED);
+    expect(order.status).toBe(OrderStatus.DELIVERED);
+  });
+
   it('should reject invalid transition PENDING → DELIVERED', () => {
     const order = createOrder();
     expect(() => order.updateStatus(OrderStatus.DELIVERED)).toThrow('Invalid status transition');

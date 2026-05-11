@@ -3,7 +3,7 @@ import type { DeliveryType } from '@prisma/client';
 import { PrismaService } from '@core/database/prisma.service';
 import { InsufficientStockError } from '../../domain/repositories/order.repository';
 import type { OrderRepository } from '../../domain/repositories/order.repository';
-import type { Order } from '../../domain/entities/order.entity';
+import type { Order, OrderStatus } from '../../domain/entities/order.entity';
 import type { PaginatedResult, PaginationDto } from '@common/dto/pagination.dto';
 import { OrderMapper } from './mappers/order.mapper';
 
@@ -42,8 +42,12 @@ export class PrismaOrderRepository implements OrderRepository {
     };
   }
 
-  async findByPharmacyId(pharmacyId: string, pagination: PaginationDto): Promise<PaginatedResult<Order>> {
-    const where = { pharmacyId };
+  async findByPharmacyId(
+    pharmacyId: string,
+    pagination: PaginationDto,
+    status?: OrderStatus,
+  ): Promise<PaginatedResult<Order>> {
+    const where = status ? { pharmacyId, status } : { pharmacyId };
 
     const [records, total] = await Promise.all([
       this.prisma.order.findMany({

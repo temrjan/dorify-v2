@@ -5,8 +5,17 @@ import { ZodValidationPipe } from '@common/pipes/zod-validation.pipe';
 import { PaginationSchema } from '@common/dto/pagination.dto';
 import type { PaginationDto } from '@common/dto/pagination.dto';
 import { OrderingService } from '../../application/ordering.service';
-import { PlaceOrderSchema, UpdateOrderStatusSchema } from '../../application/dto/order.dto';
-import type { PlaceOrderDto, UpdateOrderStatusDto } from '../../application/dto/order.dto';
+import { OrderStatus } from '../../domain/entities/order.entity';
+import {
+  PlaceOrderSchema,
+  UpdateOrderStatusSchema,
+  ListPharmacyOrdersSchema,
+} from '../../application/dto/order.dto';
+import type {
+  PlaceOrderDto,
+  UpdateOrderStatusDto,
+  ListPharmacyOrdersDto,
+} from '../../application/dto/order.dto';
 
 // ── Buyer endpoints ─────────────────────────────────────────
 
@@ -56,9 +65,14 @@ export class PharmacyOrderController {
   @Get()
   listPharmacyOrders(
     @CurrentUser('pharmacyId') pharmacyId: string,
-    @Query(new ZodValidationPipe(PaginationSchema)) pagination: PaginationDto,
+    @Query(new ZodValidationPipe(ListPharmacyOrdersSchema)) query: ListPharmacyOrdersDto,
   ) {
-    return this.orderingService.listPharmacyOrders(pharmacyId, pagination);
+    const { status, ...pagination } = query;
+    return this.orderingService.listPharmacyOrders(
+      pharmacyId,
+      pagination,
+      status as OrderStatus | undefined,
+    );
   }
 
   @Put(':id/status')
