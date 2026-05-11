@@ -41,8 +41,12 @@ export class BuyerOrderController {
   }
 
   @Get(':id')
-  getOrder(@Param('id') id: string) {
-    return this.orderingService.getOrder(id);
+  getOrder(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('pharmacyId') userPharmacyId: string | undefined,
+  ) {
+    return this.orderingService.getOrder(id, userId, userPharmacyId);
   }
 
   @Post(':id/cancel')
