@@ -4,6 +4,7 @@ import { PharmacyOnboardingPage } from './PharmacyOnboardingPage';
 import { ProductsListPage } from './products/ProductsListPage';
 import { ProductFormPage } from './products/ProductFormPage';
 import { PharmacyOrdersPage } from './orders/PharmacyOrdersPage';
+import { PaymentSettingsPage } from './payment-settings/PaymentSettingsPage';
 
 export default function PharmacyPanelPage() {
   return (
@@ -14,6 +15,7 @@ export default function PharmacyPanelPage() {
       <Route path="products/new" element={<ProductFormPage />} />
       <Route path="products/:id/edit" element={<ProductFormPage />} />
       <Route path="orders" element={<PharmacyOrdersPage />} />
+      <Route path="payment-settings" element={<PaymentSettingsPage />} />
     </Routes>
   );
 }
