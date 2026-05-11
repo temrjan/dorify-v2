@@ -113,9 +113,9 @@ export function PharmacyHomePage() {
         />
         <NavCard
           title="Профиль аптеки"
-          description="Название, адрес, график"
+          description="Название, адрес, контакты, доставка"
           Icon={IconStore}
-          disabled
+          to="profile"
         />
       </div>
     </div>

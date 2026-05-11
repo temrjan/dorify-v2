@@ -5,6 +5,7 @@ import { ProductsListPage } from './products/ProductsListPage';
 import { ProductFormPage } from './products/ProductFormPage';
 import { PharmacyOrdersPage } from './orders/PharmacyOrdersPage';
 import { PaymentSettingsPage } from './payment-settings/PaymentSettingsPage';
+import { ProfilePage } from './profile/ProfilePage';
 
 export default function PharmacyPanelPage() {
   return (
@@ -16,6 +17,7 @@ export default function PharmacyPanelPage() {
       <Route path="products/:id/edit" element={<ProductFormPage />} />
       <Route path="orders" element={<PharmacyOrdersPage />} />
       <Route path="payment-settings" element={<PaymentSettingsPage />} />
+      <Route path="profile" element={<ProfilePage />} />
     </Routes>
   );
 }

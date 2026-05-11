@@ -6,15 +6,18 @@ import { IconAlert, IconImage } from '@shared/ui/icons';
 interface LogoUploadProps {
   value: string;
   onChange: (url: string) => void;
+  /** External lock — `true` disables picker + replace + remove. Used когда родительский form мутации pending. */
+  disabled?: boolean;
 }
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
-export function LogoUpload({ value, onChange }: LogoUploadProps) {
+export function LogoUpload({ value, onChange, disabled: externalDisabled = false }: LogoUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const locked = externalDisabled || uploading;
 
   const handlePick = () => {
     inputRef.current?.click();
@@ -77,10 +80,10 @@ export function LogoUpload({ value, onChange }: LogoUploadProps) {
             }}
           />
           <div className="flex-1 flex flex-col gap-2">
-            <Button mode="outline" size="s" onClick={handlePick} disabled={uploading}>
+            <Button mode="outline" size="s" onClick={handlePick} disabled={locked}>
               Заменить
             </Button>
-            <Button mode="plain" size="s" onClick={handleRemove} disabled={uploading}>
+            <Button mode="plain" size="s" onClick={handleRemove} disabled={locked}>
               Удалить
             </Button>
           </div>
@@ -89,7 +92,7 @@ export function LogoUpload({ value, onChange }: LogoUploadProps) {
         <button
           type="button"
           onClick={handlePick}
-          disabled={uploading}
+          disabled={locked}
           aria-label="Загрузить логотип"
           aria-busy={uploading}
           className="w-full border-2 border-dashed border-tg-hint/30 hover:border-tg-hint/60 rounded-card py-8 px-4 flex flex-col items-center gap-2 transition active:scale-[0.99] disabled:opacity-60"
