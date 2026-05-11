@@ -1,12 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Inject, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { generateId } from '@shared/domain';
+import { generateId, DomainError } from '@shared/domain';
 import { ORDER_REPOSITORY, InsufficientStockError } from '../domain/repositories/order.repository';
 import type { OrderRepository } from '../domain/repositories/order.repository';
 import { PRODUCT_REPOSITORY } from '../../catalog/domain/repositories/product.repository';
 import type { ProductRepository } from '../../catalog/domain/repositories/product.repository';
 import { PHARMACY_REPOSITORY } from '../../iam/domain/repositories/pharmacy.repository';
 import type { PharmacyRepository } from '../../iam/domain/repositories/pharmacy.repository';
+import { PhoneNumber } from '../../iam/domain/value-objects/phone-number.vo';
 import { Order, OrderStatus } from '../domain/entities/order.entity';
 import { OrderItem } from '../domain/entities/order-item.entity';
 import type { PaginatedResult } from '@common/dto/pagination.dto';
@@ -25,6 +26,20 @@ export class OrderingService {
   ) {}
 
   async placeOrder(buyerId: string, dto: PlaceOrderDto): Promise<OrderResponse> {
+    // 0. Sanitize phone at DTO boundary — strips spaces/dashes/parens, validates
+    //    E.164-ish bound (9-15 digits). Order.contactPhone далее clean везде:
+    //    DM (`tel:` deep link via Telegram client), pharmacy detail sheet,
+    //    OFD invoice. Replaces frontend telHref() workaround в Mini App.
+    let sanitizedPhone: string;
+    try {
+      sanitizedPhone = PhoneNumber.create(dto.contactPhone).value;
+    } catch (err) {
+      if (err instanceof DomainError) {
+        throw new BadRequestException(`Invalid contact phone: ${err.message}`);
+      }
+      throw err;
+    }
+
     // 1. Load and validate products
     const productIds = dto.items.map((i) => i.productId);
     const products = await this.productRepo.findByIds(productIds);
@@ -99,7 +114,7 @@ export class OrderingService {
       items: orderItems,
       deliveryType: dto.deliveryType,
       deliveryAddress: dto.deliveryAddress,
-      contactPhone: dto.contactPhone,
+      contactPhone: sanitizedPhone,
       comment: dto.comment,
       initialStatus,
     });

@@ -5,6 +5,7 @@ import type { OrderItem } from './order-item.entity';
 import { OrderCreatedEvent } from '../events/order-created.event';
 import { OrderConfirmedEvent } from '../events/order-confirmed.event';
 import { OrderCancelledEvent } from '../events/order-cancelled.event';
+import { OrderStatusChangedEvent } from '../events/order-status-changed.event';
 
 export enum OrderStatus {
   PENDING = 'PENDING',
@@ -184,8 +185,23 @@ export class Order extends AggregateRoot<OrderProps> {
         `Invalid status transition: ${this.props.status} → ${newStatus}`,
       );
     }
+    const from = this.props.status;
     this.props.status = newStatus;
     this.touch();
+
+    this.addDomainEvent(new OrderStatusChangedEvent({
+      orderId: this.id,
+      pharmacyId: this.props.pharmacyId,
+      buyerId: this.props.buyerId,
+      from,
+      to: newStatus,
+      // Cast: props.deliveryType is `string` historically, но фактические
+      // значения ограничены PlaceOrderSchema enum 'PICKUP'|'DELIVERY' at DTO
+      // boundary. Полное narrowing OrderProps требует прохода через mapper +
+      // create() params + Prisma DeliveryType — отдельная архитектурная задача.
+      deliveryType: this.props.deliveryType as 'PICKUP' | 'DELIVERY',
+      deliveryAddress: this.props.deliveryAddress,
+    }));
   }
 
   markPaymentFailed(): void {
