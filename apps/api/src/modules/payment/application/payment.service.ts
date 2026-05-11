@@ -122,6 +122,21 @@ export class PaymentService {
       return;
     }
 
+    // 3.5 Amount cross-check (defense-in-depth, closes S-HIGH-10).
+    // Signature MD5(storeId+invoiceId+amount+secret) уже включает amount,
+    // но defense-in-depth: явная проверка amount match блокирует scenarios
+    // где gateway-side bug либо secret compromise могли бы привести к
+    // accepted payment с неправильной суммой. Multicard оперирует в tiyin,
+    // наш Payment.amount хранится в sum (UZS). 1 sum = 100 tiyin.
+    const TIYIN_PER_SUM = 100;
+    const expectedTiyin = payment.amount.amount * TIYIN_PER_SUM;
+    if (callback.amount !== expectedTiyin) {
+      this.logger.error(
+        `Amount mismatch for invoice ${callback.invoiceId}: callback=${callback.amount} tiyin, payment=${expectedTiyin} tiyin (${payment.amount.amount} sum)`,
+      );
+      return;
+    }
+
     // 4. Atomic mark as paid (race-condition-safe)
     const updated = await this.paymentRepo.markPaidAtomically(callback.invoiceId, {
       transactionId: callback.uuid,
