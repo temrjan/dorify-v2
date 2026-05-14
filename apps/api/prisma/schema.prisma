@@ -291,6 +291,9 @@ model Payment {
   @@index([invoiceId])
   @@index([pharmacyId, status])
   @@index([orderId])
+  // Reconcile cron query: WHERE status=PENDING AND provider=MULTICARD AND createdAt < cutoff
+  // ORDER BY createdAt ASC. Closes audit S-MED-9.
+  @@index([status, provider, createdAt])
 }
 
 // ═══════════════════════════════════════════════════════════════════
