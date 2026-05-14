@@ -1,23 +1,24 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-11** (Session 6 close — Phase 1 seller-side complete + Phase 2 customer notifications + Kimi K2.6 audit Tier A closed).
+> Updated: **2026-05-14** (Session 7 close — Kimi K2.6 audit Tier B closed 5/5; audit critical+high closed 16/16 closable).
 
 ---
 
 ## ⚡ TL;DR
 
 **Project:** Multi-tenant аптечный маркетплейс (Telegram Mini App). Миграция Express MVC v1 → NestJS DDD v2.
-**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz` (main=`ff5c517`). **БД содержит seed data** (1 pharmacy «Аптека Дорифай Демо», 1 PHARMACY_OWNER user `temrjan` Telegram ID 8503214095, 7 products всех статусов).
+**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz` (main=`f84a373`). Health endpoint теперь возвращает `{status:'ok', service:'dorify-api', db:'up', timestamp}` — реальный DB ping (S-HIGH-12). **БД содержит seed data** (1 pharmacy «Аптека Дорифай Демо», 1 PHARMACY_OWNER user `temrjan` Telegram ID 8503214095, 7 products всех статусов) + миграция `add_payment_reconcile_index` применена.
 **Captain language:** русский, directive-style. Устаёт от ceremony. **Sequential strictly** — не запускать parallel tool calls.
 **Last sessions shipped:**
 - Session 2 (2026-05-08, 6 PR #5–#10): payment frontend flow, pharmacy CRUD, CI/bot/CORS fixes.
 - Session 3 (2026-05-09, 13 PR #12–#25): полный design pass v2.
 - Session 4 (2026-05-09, 6 PR #27–#32): pharmacy onboarding spec + CI hardening + Sprint 0 + audit Phase 1.
 - Session 5 (2026-05-10, 13 PR #34–#46): Sprint 1 e2e + Phase 4 hardening 7/7 + audit deep batch 1.
-- **Session 6 (2026-05-11, 11 PR #48–#58):** Phase 1 seller-side (orders + state machine + payment-settings + profile edit) + Phase 2 customer notifications (OrderStatusChangedEvent + HTML escape + phone sanitize) + **Kimi K2.6 audit Tier A** (5 PRs: InitData replay bypass, Order IDOR, Payment IDOR, Multicard amount check, .dockerignore). **20 новых unit tests, application service test precedent установлен.**
-**Production live:** pharmacy full e2e работает (register → admin DM approval → onboarding → products CRUD → **orders с state transitions** → **payment-settings edit** → **profile edit**). Buyer получает контекстные DM на каждой смене status'а (PICKUP vs DELIVERY awareness). **3 critical IDOR closed.** Audit critical+high closed **12/12** (Phase 1 + deep batch 1 + Kimi Tier A — все verified).
-**Next session entry point:** Kimi audit Tier B (5 PRs, ~155 LOC) — PublicPharmacyResponse DTO, createPharmacy `$transaction`, stock restore atomic, health DB ping, schema indexes. Либо Phase 3 (bot pendingRejectAt timeout + friendly admin race), либо Phase 7 (Search/Avi) — Captain's call.
+- Session 6 (2026-05-11, 11 PR #48–#58): Phase 1 seller-side + Phase 2 customer notifications + Kimi audit Tier A (3 critical IDOR + 1 high + 1 medium).
+- **Session 7 (2026-05-14, 5 PR #59–#63):** **Kimi K2.6 audit Tier B полностью closed** — PublicPharmacyResponse DTO split (S-CRIT-9), createPharmacy `$transaction` + createWithOwnerPromotion repo method (S-CRIT-10 + S-MED-6), stock restore atomic increment (S-HIGH-8), Health DB ping с 2s timeout (S-HIGH-12), Payment reconcile composite index (S-MED-9 + migration applied + EXPLAIN verified). **14 новых unit tests (189 total), все 4 gates green per PR, /typescript-review + /security-review каждому PR.**
+**Production live:** pharmacy full e2e работает (Session 6 features) + audit critical+high закрыты 16/16 closable findings. **Все 5 Kimi critical findings closed.** Tier B PRs ushered through full split-mode pipeline: /codex → intake → plan → /selfcheck (12 findings) → /check (8 findings) → Captain approve → 5 atomic PRs sequential → каждому /typescript-review + /security-review → CI green → merge → post-deploy verify (включая SSH-проверку миграции через `prisma migrate status` + `EXPLAIN ANALYZE`).
+**Next session entry point:** Phase 3 bot UX polish (~30 мин — pendingRejectAt timeout + friendly admin race), либо Phase 7 Search/Avi (~5-7 дней, pgvector + AI search), либо Tier C backlog (S-HIGH-9 outbox pattern, S-HIGH-11 bot persistent session, payment.failed flow, и т.д.), либо buyer-side smoke test (Block 5, ~15 мин — still pending с Session 5). Captain's call.
 
 ---
 
@@ -197,6 +198,63 @@ Engineer работает соло (no separate Reviewer agent), но имити
 | #42 | `docs: Session 5 handoff` | +73 docs |
 | #43 | `fix(web): wizard slug auto-derive` (smoke #1 — auto-derive только первый символ работал; SlugField теперь management state internally) | +35/-35 |
 | #44 | `fix(api): pharmacy.verified DM uses web_app button` (smoke #2 — plain URL DM не injected initData → Mini App 401 → onboarding all-grey; теперь web_app button) | +21/-4 |
+
+## Что отгружено в Session 7 (2026-05-14) — Kimi audit Tier B closed 5/5
+
+5 PRs за день (#59-#63). Production main=`f84a373`. **Audit critical+high closed 16/16 closable findings.**
+
+| PR | Severity | Содержание | Размер |
+|---|---|---|---|
+| #59 | CRITICAL→HIGH | `fix(api): split PublicPharmacyResponse — close S-CRIT-9 PII leak` (отдельный `PublicPharmacyResponse` DTO без address/phone/license; `getPharmacyById` returns public projection; owner-side endpoints сохраняют full; 3 unit tests — первый iam application service spec) | +116/-3 |
+| #60 | CRITICAL | `fix(api): atomic createPharmacy — close S-CRIT-10 + S-MED-6` (новый `PharmacyRepository.createWithOwnerPromotion` через `prisma.$transaction`; P2002 catch → ConflictException 409; parallel pre-flight checks через `Promise.all`; NotFoundException на missing user; events emit ПОСЛЕ commit; 5 unit tests) | +172/-17 |
+| #61 | HIGH | `fix(api): atomic stock restore on cancel — close S-HIGH-8` (новый `ProductRepository.restoreStockAtomic` mirror placeAtomically pattern; OnOrderCancelledRestoreStock упрощён до 1 repo call; soft-delete safety via `deletedAt: null`; 3 unit tests) | +102/-11 |
+| #62 | HIGH | `fix(api): real DB ping in /health — close S-HIGH-12` (Promise.race с 2s timeout vs `prisma.$queryRaw \`SELECT 1\``; try/catch/finally с clearTimeout cleanup; 503 ServiceUnavailableException на failure; CI deploy gate fast-fail на dead DB; 3 unit tests включая fake-timer на 2s cap) | +88/-2 |
+| #63 | MEDIUM | `fix(api): add Payment reconcile index — close S-MED-9` (composite `@@index([status, provider, createdAt])` для reconcile cron query; migration `add_payment_reconcile_index`; **applied на production verified via SSH `prisma migrate status` + `EXPLAIN ANALYZE` confirmed `Index Scan` на reconcile query**) | +9 |
+
+### Tier B audit closure summary
+
+| Finding | Pre-Session 7 | Post-Session 7 |
+|---|---|---|
+| S-CRIT-9 Public pharmacy PII leak | open | ✅ #59 |
+| S-CRIT-10 createPharmacy orphan | open | ✅ #60 (rollback закрывает orphan) |
+| S-MED-6 Banned user orphan | open | ✅ #60 (через tx rollback automatically) |
+| S-HIGH-8 Stock restore race | open | ✅ #61 |
+| S-HIGH-12 Health false-green | open | ✅ #62 |
+| S-MED-9 Payment reconcile index | open | ✅ #63 |
+
+**Все Kimi K2.6 critical findings closed.** Remaining backlog — Tier C medium architectural items (S-HIGH-9 outbox, S-HIGH-11 bot persistent session) + low tech-debt (S-LOW-1 i18n bootstrap, etc.).
+
+### Tests added Session 7
+
+- `apps/api/src/modules/iam/__tests__/iam.service.spec.ts` (new): 7 tests (3 getPharmacyById public projection + 4 createPharmacy atomic) — первый iam application service spec.
+- `apps/api/src/modules/ordering/__tests__/on-order-cancelled.handler.spec.ts` (new): 3 tests на atomic restore.
+- `apps/api/src/__tests__/health.controller.spec.ts` (new): 3 tests включая fake-timer 2s cap.
+
+Total backend tests: **189** (was 175 — 14 new + 1 expand). Frontend tests: still none.
+
+### Process refinements Session 7
+
+1. **Split-mode pipeline followed cleanly:** /codex bootstrap → intake probes → план с per-fix breakdown → /selfcheck (12 findings) → /check (8 findings) → Captain approve word → 5 atomic PRs sequential. Каждый PR прошёл /typescript-review + /security-review до commit.
+2. **Major план correction в /check:** S-CRIT-10 misdiagnosed как concurrent-POST race; schema.prisma probe (Pharmacy.ownerId @unique + Pharmacy.slug @unique) показал что concurrent уже защищён DB level. Real угроза = partial-failure orphan. План simplified от 50 LOC до 30 LOC.
+3. **Repository-level `prisma.$transaction`:** Captain выбрал `createWithOwnerPromotion` в `PrismaPharmacyRepository` (infrastructure, где Prisma legitimate) vs service-level inject. DDD-чисто, signatures save() не трогаются.
+4. **Migration verification protocol:** post-deploy SSH на 7demo → `docker exec dorify-backend npx prisma migrate status` (confirmed «Database schema is up to date!») + `EXPLAIN` query showed `Index Scan using Payment_status_provider_createdAt_idx`. Pattern для будущих миграций.
+5. **Docs through PR flow:** в отличие от Session 6 (direct-push docs commit b3098ca), Session 7 docs commit через PR — следуем Session 5 pattern.
+
+### Хроника Session 7
+
+1. **Cold-start intake** (~30 мин) — Captain «работаем с этим проектом соло. Изучи документы, мемори, определи где остановились. Сравни документацию и реальную обстановку.» Engineer прочитал ENGINEER-HANDOFF.md, state.json, recent commits, проверил production health → подтвердил всё совпадает с docs. Создал memory file `dorify-v2-progress.md` + обновил `MEMORY.md` index.
+
+2. **Captain options check** (~5 мин) — показал 4 опции для Session 7 (Tier B / smoke / Phase 3 / Phase 7). Captain выбрал **Tier B (Recommended)**.
+
+3. **/codex bootstrap** (~5 мин) — стандарты architecture, ddd, nestjs, postgresql, testing загружены.
+
+4. **Intake + plan + reviews** (~45 мин) — probed pharmacy/iam/ordering/catalog/health files. План с 5 atomic PRs (LOC estimates, tests, risks). /selfcheck выявил 12 findings (4 categories) — план refined. /check (adversarial) выявил 8 findings — important corrections (S-CRIT-10 misdiagnosed, isBanned check redundant, P2002 catch missing, $queryRaw нет per-query timeout). Captain выбрал 3 решения: repo-level tx, single Payment index, all 5 atomic.
+
+5. **Captain approve word + 5 sequential PRs** (~4 часа) — каждый PR: branch → code → tests → 4 local gates → /typescript-review (apply findings) → /security-review (clean) → commit → push → CI green → Captain «мердж готов» → squash merge → sync main → watch deploy → verify production. Tests went 175 → 186/186 across all 5 PRs, +14 new.
+
+6. **Migration verification (PR #63)** (~10 мин) — Captain «проверь миграцию применилась». SSH 7demo → `docker compose exec dorify-backend npx prisma migrate status` → «Database schema is up to date!». `docker exec postgres psql ... \d "Payment"` показал новый `Payment_status_provider_createdAt_idx`. `EXPLAIN` reconcile query → `Index Scan using Payment_status_provider_createdAt_idx`. Confirmation. **Note:** Postgres контейнер на 7demo называется просто `postgres` (pgvector image), не часть dorify compose stack — host shared между проектами (aqllify-db, ledger-ai-postgres, postgres).
+
+7. **Session close** — Captain «обнови документацию и закрой сессию». Handoff + AUDIT_REPORT + state.json + memory обновлены. Docs committed через PR (Session 5 pattern).
 
 ## Что отгружено в Session 6 (2026-05-11) — Phase 1 seller-side + Phase 2 customer notifications + Kimi audit Tier A
 
@@ -609,45 +667,38 @@ Codex стандарты в `~/Codex/standards/`:
 
 ---
 
-## ⏭ Next session (Session 7) — entry point
+## ⏭ Next session (Session 8) — entry point
 
-**Captain в финале Session 6:** «сегодня заканчиваем, обнови документацию, создай хэндофф, клинап». Tier A Kimi audit полностью closed; Tier B и backlog ждут.
+**Captain в финале Session 7:** «обнови документацию и закрой сессию». **Все Kimi K2.6 critical+high closable findings closed (16/16).** Остаются Tier C backlog medium-architectural items + low tech-debt + неполный buyer smoke. Phase 7 Search/Avi всё ещё untackled.
 
-### Опция A (Recommended) — Kimi Tier B (5 PRs, ~155 LOC)
+### Опция A — Phase 3 bot UX polish (~30 мин, 1 PR)
 
-Architectural fixes которые требуют больше LOC + design thinking чем Tier A. Каждый отдельный PR.
-
-| # | Severity | Что | Estimate LOC |
-|---|---|---|---|
-| 1 | CRITICAL (overstated → HIGH) | **S-CRIT-9 PublicPharmacyResponse DTO split** — `GET /pharmacy/:id` сейчас отдаёт address+phone+license unauthenticated buyers. Нужен PublicPharmacyResponse (name, slug, logo, hasPaymentSettings, deliveryEnabled/Price, description) vs full Response. Frontend `@shared/types Pharmacy` narrows = breaking change для cart, onboarding callers. | ~60 |
-| 2 | CRITICAL | **S-CRIT-10 + S-MED-6 createPharmacy `$transaction`** — двойной POST от одного user создаёт orphan pharmacy (no tx wrapping pharmacyRepo.save + userRepo.save). Plus user.isBanned check. Repository interface либо service-level prismaService для tx wrapping. | ~40 |
-| 3 | HIGH | **S-HIGH-8 Stock restore atomic increment** — OnOrderCancelledRestoreStock использует findById→restoreStock→save (read-modify-write race). Mirror placeAtomically pattern: `tx.product.updateMany({where, data: {stock: {increment}}})`. Architectural choice: domain bypass (10 LOC) vs new repository method (30 LOC clean). | ~30 |
-| 4 | HIGH | **S-HIGH-12 Health DB ping** — `/health` endpoint статично возвращает 200 даже если БД down. Add Prisma `SELECT 1` + return 503 on failure. | ~10 |
-| 5 | MEDIUM | **S-MED-9 Schema indexes** (Kimi Appendix B) — `@@index([status, provider, createdAt])` для Payment reconcile cron + `@@index([pharmacyId, createdAt])` для Order pharmacy-only queries без status filter. Требует production migration coordination. | ~5 + migration |
-
-### Опция B — Phase 3 (bot UX polish, ~30 мин)
-
-Originally planned, не успели сегодня:
+Self-contained backlog item, легко close'нуть в начале сессии:
 - `pendingRejectAt` timestamp в bot session + 5-min auto-clear (gidstroy advisory #3 + Kimi S-MED-8 overlap)
 - Friendly «Уже обработано другим админом» вместо raw DomainError text (gidstroy advisory #4 + Kimi race fix)
 
-### Опция C — Phase 7 Search/Avi (~5-7 дней)
+### Опция B — Phase 7 Search/Avi (~5-7 дней, многоэтапный sprint)
 
-Qdrant→pgvector переход, Product events chain, AI search UI. Captain decision на pgvector closed; остался implementation.
+Qdrant→pgvector переход (Captain decision на pgvector closed), Product events chain, AI search UI. Самый крупный остающийся feature scope.
 
-### Опция D — Tier C backlog (medium architectural)
+### Опция C (Recommended after Tier B) — Tier C backlog architectural
 
-- **S-HIGH-9 Outbox pattern** — In-memory EventEmitter crash silence. Major architectural: либо outbox table в DB либо Redis Streams. Multi-day work.
-- **S-HIGH-11 Bot persistent session** — Redis либо Prisma session store. Medium work.
-- **S-HIGH-13 Upload throttling** — ThrottlerModule + per-user quota.
+Medium-size architectural items:
+- **S-HIGH-9 Outbox pattern** — In-memory EventEmitter crash silence. Либо outbox table в DB либо Redis Streams. **Multi-day work** — proper design ceremony нужен.
+- **S-HIGH-11 Bot persistent session** — Redis либо Prisma session store. **Medium work** (~1 day).
+- **S-HIGH-13 Upload throttling** — ThrottlerModule + per-user quota. **Small** (~2 hours).
 - **S-MED-4 + S-MED-5 payment.failed flow** — markPaymentFailed wire + buyer notification handler.
 - **S-MED-7 Phone format alignment** — UZ-only enforce либо international parity между frontend/backend.
 - **S-MED-10 Swagger wiring** — SwaggerModule.setup() behind admin guard.
 - **S-LOW-1 i18n bootstrap** — react-i18next setup, всё UI strings в ключах.
 
-### Опция E — Buyer-side smoke (~15 мин)
+### Опция D — Buyer-side smoke (~15 мин)
 
-Session 5 Block 5 (buyer flow) до сих pending. Captain не приоритизировал в Session 6 — может пройти сейчас за 15 мин с новыми статусами + buyer DMs.
+Session 5 Block 5 (buyer flow) **до сих pending**. Captain не приоритизировал ни в Session 6, ни в Session 7. Может пройти сейчас за 15 мин с новыми статусами + buyer DMs + новый PublicPharmacyResponse + atomic stock restore. Хорошая verification что вся Tier B работа реально не сломала flow.
+
+### Опция E — Migration v1→v2 (~1 неделя)
+
+`docs/DORIFY_V2_DDD.md §10` Phase 8 — данные production v1. Полностью untackled, но критично перед cutover. Скрипт extraction users / pharmacies / products / orders / payments + re-encrypt Multicard secrets.
 
 ---
 
