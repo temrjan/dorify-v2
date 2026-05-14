@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/database/prisma.service';
 import type { PharmacyRepository } from '../../domain/repositories/pharmacy.repository';
 import type { Pharmacy } from '../../domain/entities/pharmacy.entity';
+import type { User } from '../../domain/entities/user.entity';
 import { PharmacyMapper } from './mappers/pharmacy.mapper';
 
 @Injectable()
@@ -51,5 +53,33 @@ export class PrismaPharmacyRepository implements PharmacyRepository {
         multicardSecret: data.multicardSecret,
       },
     });
+  }
+
+  async createWithOwnerPromotion(pharmacy: Pharmacy, owner: User): Promise<void> {
+    const data = PharmacyMapper.toPersistence(pharmacy);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.pharmacy.create({ data });
+        await tx.user.update({
+          where: { id: owner.getId() },
+          data: { role: owner.role },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const targetRaw = error.meta?.target;
+        const target = Array.isArray(targetRaw)
+          ? targetRaw.join(', ')
+          : typeof targetRaw === 'string'
+            ? targetRaw
+            : 'unique field';
+        throw new ConflictException(`Pharmacy ${target} already taken`);
+      }
+      throw error;
+    }
   }
 }

@@ -49,16 +49,22 @@ export class IamService {
   }
 
   async createPharmacy(ownerId: string, dto: CreatePharmacyDto): Promise<PharmacyResponse> {
-    // Check if user already has a pharmacy
-    const existing = await this.pharmacyRepo.findByOwnerId(ownerId);
+    // Pre-flight friendly errors — parallel queries (~33% latency vs sequential).
+    // DB unique constraints на ownerId + slug защищают от race; эти checks — UX,
+    // не race protection.
+    const [existing, slugExists, owner] = await Promise.all([
+      this.pharmacyRepo.findByOwnerId(ownerId),
+      this.pharmacyRepo.findBySlug(dto.slug),
+      this.userRepo.findById(ownerId),
+    ]);
     if (existing) {
       throw new ConflictException('User already has a pharmacy');
     }
-
-    // Check slug uniqueness
-    const slugExists = await this.pharmacyRepo.findBySlug(dto.slug);
     if (slugExists) {
       throw new ConflictException(`Slug "${dto.slug}" is already taken`);
+    }
+    if (!owner) {
+      throw new NotFoundException(`User ${ownerId} not found`);
     }
 
     const pharmacy = Pharmacy.create({
@@ -71,15 +77,16 @@ export class IamService {
       license: dto.license,
     });
 
-    await this.pharmacyRepo.save(pharmacy);
+    // Domain mutation — throws DomainError if owner.isBanned (closes S-MED-6
+    // via rollback: createWithOwnerPromotion не commit'ит partial state).
+    owner.promoteToPharmacyOwner(pharmacy.getId());
 
-    // Promote user to pharmacy owner
-    const user = await this.userRepo.findById(ownerId);
-    if (user) {
-      user.promoteToPharmacyOwner(pharmacy.getId());
-      await this.userRepo.save(user);
-    }
+    // Atomic persist — pharmacy create + user role update в одной транзакции
+    // (closes S-CRIT-10 orphan pharmacy от partial failure).
+    await this.pharmacyRepo.createWithOwnerPromotion(pharmacy, owner);
 
+    // Emit ПОСЛЕ successful commit — иначе rollback оставляет emitted DM
+    // без backing row (admin DM на orphan-state).
     this.emit(new PharmacyCreatedEvent({
       pharmacyId: pharmacy.getId(),
       ownerId,
