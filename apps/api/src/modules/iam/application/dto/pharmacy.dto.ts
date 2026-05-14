@@ -47,6 +47,26 @@ export interface PharmacyResponse {
   createdAt: string;
 }
 
+/**
+ * Public projection — что отдаём unauthenticated buyer'ам на GET /pharmacy/:id.
+ * Закрывает audit S-CRIT-9: address / phone / license — PII продавца, попадали
+ * в leak vector. Owner-side endpoints (`getPharmacyProfile`, `updatePharmacyProfile`)
+ * продолжают возвращать full `PharmacyResponse` — владелец видит свои данные.
+ */
+export interface PublicPharmacyResponse {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  logo?: string;
+  isActive: boolean;
+  isVerified: boolean;
+  deliveryEnabled: boolean;
+  deliveryPrice?: number;
+  hasPaymentSettings: boolean;
+  createdAt: string;
+}
+
 export interface PaymentSettingsResponse {
   multicardAppId?: string;
   multicardStoreId?: string;
