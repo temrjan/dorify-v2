@@ -1,13 +1,17 @@
 # Dorify v2 — Comprehensive Audit Report
 
-**Date:** 2026-05-09 (Claude Code audit) · **Last status update:** 2026-05-11 (Session 6 close + Kimi K2.6 audit integration)
+**Date:** 2026-05-09 (Claude Code audit) · **Last status update:** 2026-05-14 (Session 7 close + Kimi Tier B closed 5/5)
 **Auditor:** Claude Code (initial) + Kimi K2.6 (Session 6 cross-check, 2026-05-11)
 **Scope:** Backend API, Frontend Web, Telegram Bot, Infrastructure, Security
 **Branch:** `main`
 
-## Status summary (2026-05-11)
+## Status summary (2026-05-14)
 
 **Claude Code original audit — critical+high closed: 12/12** (all actionable items, S-CRIT-2 partial по design — JWT для Admin SPA = Phase 8).
+
+**Kimi K2.6 audit — critical+high closed: 7/7 closable items** (5 critical: #54 #55 #56 #59 #60, 2 high: #57 #62 #61). Remaining 4 high — backlog architectural: S-HIGH-9 outbox, S-HIGH-11 persistent session, S-HIGH-13 upload throttle. Medium: 4/8 closed (#58 #60 #61 #63), 4 backlog.
+
+**Combined audit critical+high status (2026-05-14): 16/16 closable findings closed.**
 
 | ID | Finding | Status | PR |
 |---|---|---|---|
@@ -39,18 +43,18 @@ Captain заказал independent audit от Kimi K2.6 (Chinese model). Най�
 | **S-CRIT-6** | InitData future-date replay bypass (`now - authDate > ttl` для future authDate negative → always passes) | ✅ closed | #54 |
 | **S-CRIT-7** | Order GET endpoint IDOR — getOrder без ownership check | ✅ closed | #55 |
 | **S-CRIT-8** | Payment-by-order endpoint IDOR — getPaymentByOrder без ownership | ✅ closed | #56 |
-| **S-CRIT-9** | Public pharmacy endpoint leaks PII (address, phone, license к unauthenticated buyers) | ⏳ Tier B (pending) |  |
-| **S-CRIT-10** | Pharmacy registration race condition — createPharmacy + promoteToOwner без $transaction | ⏳ Tier B (pending) |  |
+| **S-CRIT-9** | Public pharmacy endpoint leaks PII (address, phone, license к unauthenticated buyers) | ✅ closed | #59 |
+| **S-CRIT-10** | Pharmacy registration race condition — createPharmacy + promoteToOwner без $transaction | ✅ closed (createWithOwnerPromotion repo method + tx rollback) | #60 |
 
 ### High
 
 | ID | Finding | Status | PR |
 |---|---|---|---|
-| **S-HIGH-8** | Stock restore on cancel non-atomic (findById→restoreStock→save race) | ⏳ Tier B (pending) |  |
+| **S-HIGH-8** | Stock restore on cancel non-atomic (findById→restoreStock→save race) | ✅ closed (restoreStockAtomic mirror placeAtomically) | #61 |
 | **S-HIGH-9** | In-memory events = silent failures on crash | ⏳ backlog (outbox pattern, multi-day work) |  |
 | **S-HIGH-10** | Multicard callback missing amount cross-check | ✅ closed (defense-in-depth) | #57 |
 | **S-HIGH-11** | Bot in-memory session lost on restart | ⏳ backlog (Redis либо Prisma session store) |  |
-| **S-HIGH-12** | Health check не validates DB connectivity | ⏳ Tier B (pending) |  |
+| **S-HIGH-12** | Health check не validates DB connectivity | ✅ closed (Promise.race + 2s timeout) | #62 |
 | **S-HIGH-13** | Upload endpoint unbounded disk-exhaustion vector | ⏳ backlog (ThrottlerModule + per-user quota) |  |
 
 ### Medium
@@ -59,10 +63,10 @@ Captain заказал independent audit от Kimi K2.6 (Chinese model). Най�
 |---|---|---|---|
 | **S-MED-4** | Order state machine missing payment-failed transition | ⏳ backlog |  |
 | **S-MED-5** | Missing payment.failed event / buyer notification | ⏳ backlog |  |
-| **S-MED-6** | Banned user can create orphan pharmacy (overlaps S-CRIT-10 fix) | ⏳ Tier B (вместе с S-CRIT-10) |  |
+| **S-MED-6** | Banned user can create orphan pharmacy (overlaps S-CRIT-10 fix) | ✅ closed (через tx rollback automatically) | #60 |
 | **S-MED-7** | Phone number VO accepts non-Uzbek, frontend assumes +998 | ⏳ backlog (design decision) |  |
 | **S-MED-8** | Bot admin reject overwrites concurrent session state (overlaps gidstroy advisory) | ⏳ Phase 3 либо backlog |  |
-| **S-MED-9** | Missing composite DB index для payment reconcile query | ⏳ Tier B (pending) |  |
+| **S-MED-9** | Missing composite DB index для payment reconcile query | ✅ closed (migration `add_payment_reconcile_index` + EXPLAIN verified) | #63 |
 | **S-MED-10** | Swagger installed но not wired | ⏳ backlog |  |
 | **S-MED-11** | No .dockerignore — env/secret leak в image layers | ✅ closed | #58 |
 
@@ -85,6 +89,20 @@ placeAtomically race protection, markPaidAtomically idempotency, callback IP whi
 | #58 | S-MED-11 | +61 | — |
 
 **Self-correction noted**: Engineer пропустил S-CRIT-7 + S-CRIT-8 во время Phase 1+2 /security-review skill runs. Pattern: /security-review focuses on new mutations, NOT на existing GET endpoints с :id parameter. Process improvement для следующих audits — explicitly probe all GET handlers с path params.
+
+### Session 7 Tier B closure (5 PRs, 2026-05-14)
+
+| PR | Finding | LOC | Tests added |
+|---|---|---|---|
+| #59 | S-CRIT-9 | +116/-3 | 3 (IamService.getPharmacyById public projection) — первый iam application service spec |
+| #60 | S-CRIT-10 + S-MED-6 | +172/-17 | 4 (createPharmacy atomic create + promote, P2002 propagation, NotFoundException, banned user) |
+| #61 | S-HIGH-8 | +102/-11 | 3 (OnOrderCancelledRestoreStock atomic call, no legacy save/findById, empty items no-op) |
+| #62 | S-HIGH-12 | +88/-2 | 3 (HealthController DB ping happy path, 503 на rejected, 2s timeout fake-timer) |
+| #63 | S-MED-9 | +9 (schema+migration) | — (migration applied + EXPLAIN verified post-deploy) |
+
+**Verified post-deploy:** SSH 7demo → `docker compose exec dorify-backend npx prisma migrate status` → "Database schema is up to date!". `docker exec postgres psql ... \d "Payment"` показал новый `Payment_status_provider_createdAt_idx`. `EXPLAIN` reconcile query → `Index Scan using Payment_status_provider_createdAt_idx`.
+
+**Process refinement (Session 7):** split-mode pipeline followed cleanly. Major план correction during /check — S-CRIT-10 был misdiagnosed как concurrent-POST race; schema probe (Pharmacy.ownerId @unique + Pharmacy.slug @unique) показал DB-level protection. Real угроза = partial-failure orphan, не concurrent. План simplified от 50 LOC до 30 LOC, repo-level `createWithOwnerPromotion` chosen over service-level inject (DDD purity).
 
 > **Note:** Original audit title — «Dorify v2 (GidStroy)». Auditor periodically
 > confused dorify-v2 с gidstroy (related project). False positives:
