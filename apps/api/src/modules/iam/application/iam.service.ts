@@ -12,7 +12,7 @@ import type { PharmacyRepository } from '../domain/repositories/pharmacy.reposit
 import { Pharmacy } from '../domain/entities/pharmacy.entity';
 import { PhoneNumber } from '../domain/value-objects/phone-number.vo';
 import { PharmacyCreatedEvent, PharmacyVerifiedEvent, PharmacyRejectedEvent } from '../domain/events';
-import type { CreatePharmacyDto, UpdatePharmacyDto, UpdatePaymentSettingsDto, PharmacyResponse, PaymentSettingsResponse, SlugAvailabilityResponse } from './dto/pharmacy.dto';
+import type { CreatePharmacyDto, UpdatePharmacyDto, UpdatePaymentSettingsDto, PharmacyResponse, PublicPharmacyResponse, PaymentSettingsResponse, SlugAvailabilityResponse } from './dto/pharmacy.dto';
 import type { AdminLoginDto, AuthResponse } from './dto/auth.dto';
 
 @Injectable()
@@ -153,12 +153,12 @@ export class IamService {
     return this.toPharmacyResponse(pharmacy);
   }
 
-  async getPharmacyById(pharmacyId: string): Promise<PharmacyResponse> {
+  async getPharmacyById(pharmacyId: string): Promise<PublicPharmacyResponse> {
     const pharmacy = await this.pharmacyRepo.findById(pharmacyId);
     if (!pharmacy) {
       throw new NotFoundException(`Pharmacy ${pharmacyId} not found`);
     }
-    return this.toPharmacyResponse(pharmacy);
+    return this.toPublicPharmacyResponse(pharmacy);
   }
 
   async updatePharmacyProfile(ownerId: string, dto: UpdatePharmacyDto): Promise<PharmacyResponse> {
@@ -238,6 +238,22 @@ export class IamService {
       address: pharmacy.address,
       phone: pharmacy.phone.value,
       license: pharmacy.license,
+      logo: pharmacy.logo,
+      isActive: pharmacy.isActive,
+      isVerified: pharmacy.isVerified,
+      deliveryEnabled: pharmacy.deliveryEnabled,
+      deliveryPrice: pharmacy.deliveryPrice,
+      hasPaymentSettings: pharmacy.hasMulticardCredentials(),
+      createdAt: pharmacy.createdAt.toISOString(),
+    };
+  }
+
+  private toPublicPharmacyResponse(pharmacy: Pharmacy): PublicPharmacyResponse {
+    return {
+      id: pharmacy.getId(),
+      name: pharmacy.name,
+      slug: pharmacy.slug,
+      description: pharmacy.description,
       logo: pharmacy.logo,
       isActive: pharmacy.isActive,
       isVerified: pharmacy.isVerified,
