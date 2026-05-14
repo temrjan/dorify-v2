@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@core/database/prisma.service';
-import type { ProductRepository, ProductListFilters } from '../../domain/repositories/product.repository';
+import type { ProductRepository, ProductListFilters, RestoreStockItem } from '../../domain/repositories/product.repository';
 import type { Product } from '../../domain/entities/product.entity';
 import type { PaginatedResult, PaginationDto } from '@common/dto/pagination.dto';
 import { ProductMapper } from './mappers/product.mapper';
@@ -8,6 +8,8 @@ import type { Prisma, ProductStatus } from '@prisma/client';
 
 @Injectable()
 export class PrismaProductRepository implements ProductRepository {
+  private readonly logger = new Logger(PrismaProductRepository.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async findById(id: string): Promise<Product | undefined> {
@@ -109,6 +111,24 @@ export class PrismaProductRepository implements ProductRepository {
         moderatedAt: data.moderatedAt,
         moderationNote: data.moderationNote,
       },
+    });
+  }
+
+  async restoreStockAtomic(items: RestoreStockItem[]): Promise<void> {
+    if (items.length === 0) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const result = await tx.product.updateMany({
+          where: { id: item.productId, deletedAt: null },
+          data: { stock: { increment: item.quantity } },
+        });
+        if (result.count === 0) {
+          this.logger.warn(
+            `restoreStockAtomic: product ${item.productId} not found (deleted?) — skip +${item.quantity}`,
+          );
+        }
+      }
     });
   }
 

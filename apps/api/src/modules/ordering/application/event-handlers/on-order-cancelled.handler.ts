@@ -14,15 +14,13 @@ export class OnOrderCancelledRestoreStock {
 
   @OnEvent('order.cancelled')
   async handle(event: OrderCancelledEvent): Promise<void> {
-    this.logger.log(`Restoring stock for cancelled order ${event.payload.orderId}`);
+    this.logger.log(
+      `Restoring stock for cancelled order ${event.payload.orderId} (${event.payload.items.length} items)`,
+    );
 
-    for (const item of event.payload.items) {
-      const product = await this.productRepo.findById(item.productId);
-      if (product) {
-        product.restoreStock(item.quantity);
-        await this.productRepo.save(product);
-        this.logger.log(`Stock restored: ${product.name} +${item.quantity} → ${product.stock}`);
-      }
-    }
+    // Atomic increment per item — closes audit S-HIGH-8: prior read-modify-write
+    // (findById → restoreStock → save) had race window для concurrent cancellations
+    // того же order. updateMany WHERE — atomic at DB level.
+    await this.productRepo.restoreStockAtomic(event.payload.items);
   }
 }
