@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useShallow } from 'zustand/react/shallow';
 import { Button, Input, Spinner, Text, Textarea } from '@telegram-apps/telegram-ui';
 import { useCartStore, selectItemsByPharmacy } from '@shared/stores/cartStore';
 import { ordersApi } from '@shared/api/orders';
@@ -17,7 +18,7 @@ import { IconAlert, IconCheck } from '@shared/ui/icons';
 export default function InquiryPage() {
   const navigate = useNavigate();
   const { pharmacyId = '' } = useParams<{ pharmacyId: string }>();
-  const itemsByPharmacy = useCartStore(selectItemsByPharmacy);
+  const itemsByPharmacy = useCartStore(useShallow(selectItemsByPharmacy));
   const clearPharmacy = useCartStore((s) => s.clearPharmacy);
   const items = itemsByPharmacy.get(pharmacyId) ?? [];
 
