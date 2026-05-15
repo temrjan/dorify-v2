@@ -2,6 +2,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Input, Text, Spinner } from '@telegram-apps/telegram-ui';
 import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useShallow } from 'zustand/react/shallow';
 import { useCartStore, selectItemsByPharmacy } from '@shared/stores/cartStore';
 import { ordersApi } from '@shared/api/orders';
 import { paymentsApi } from '@shared/api/payments';
@@ -65,7 +66,7 @@ export default function CheckoutPage() {
 
   const items = useCartStore((s) => s.items);
   const clearPharmacy = useCartStore((s) => s.clearPharmacy);
-  const itemsByPharmacy = useCartStore(selectItemsByPharmacy);
+  const itemsByPharmacy = useCartStore(useShallow(selectItemsByPharmacy));
 
   // Resolve target pharmacy: explicit ?pharmacyId= wins, else first in cart.
   const targetPharmacyId = pharmacyId ?? Array.from(itemsByPharmacy.keys())[0];

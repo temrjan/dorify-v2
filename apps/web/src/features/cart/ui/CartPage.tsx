@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
+import { useShallow } from 'zustand/react/shallow';
 import { Button, Spinner, Text } from '@telegram-apps/telegram-ui';
 import { useCartStore, selectTotalItems, selectTotalPrice, selectItemsByPharmacy } from '@shared/stores/cartStore';
 import { pharmaciesApi } from '@shared/api/pharmacies';
@@ -168,7 +169,7 @@ export default function CartPage() {
   const clearCart = useCartStore((s) => s.clearCart);
   const totalItems = useCartStore(selectTotalItems);
   const totalPrice = useCartStore(selectTotalPrice);
-  const itemsByPharmacy = useCartStore(selectItemsByPharmacy);
+  const itemsByPharmacy = useCartStore(useShallow(selectItemsByPharmacy));
 
   const pharmacyIds = Array.from(itemsByPharmacy.keys());
   const pharmacyQueries = useQueries({
