@@ -3,6 +3,7 @@ import { FixedLayout, Tabbar } from '@telegram-apps/telegram-ui';
 import type { ReactNode } from 'react';
 import { IconHome, IconSearch, IconCart, IconUser } from '@shared/ui/icons';
 import { useCartStore, selectTotalItems } from '@shared/stores/cartStore';
+import { ErrorBoundary } from '@shared/ui/ErrorBoundary';
 
 const TABS = [
   { id: '/', label: 'Главная', Icon: IconHome },
@@ -26,7 +27,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className={hideTabbar ? '' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]'}>
-      {children}
+      <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
 
       {!hideTabbar && (
         <FixedLayout vertical="bottom">

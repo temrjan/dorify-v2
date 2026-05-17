@@ -16,6 +16,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false,
+    // 'hidden' generates .map files for DevTools but omits the //# sourceMappingURL
+    // comment from JS, so prod bundles stay slim and original sources aren't auto-fetched.
+    sourcemap: 'hidden',
   },
 });
