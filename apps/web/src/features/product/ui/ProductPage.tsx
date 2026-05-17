@@ -8,9 +8,15 @@ import { PriceTag } from '@shared/ui/PriceTag';
 import { Skeleton } from '@shared/ui/Skeleton';
 import { EmptyState } from '@shared/ui/EmptyState';
 import { Pill } from '@shared/ui/Pill';
-import { IconPackage, IconCheck, IconAlert } from '@shared/ui/icons';
+import {
+  IconPackage,
+  IconCheck,
+  IconAlert,
+  IconChevronRight,
+} from '@shared/ui/icons';
 
-const ADDED_FEEDBACK_MS = 1500;
+// Toast visible for 2s — enough to read «Добавлено» + tap «Перейти» if wanted.
+const ADDED_FEEDBACK_MS = 2000;
 
 function ProductSkeleton() {
   return (
@@ -36,7 +42,10 @@ export default function ProductPage() {
   const navigate = useNavigate();
   const addItem = useCartStore((s) => s.addItem);
   const [quantity, setQuantity] = useState(1);
-  const [added, setAdded] = useState(false);
+  // `addedAt` doubles as a "show toast" flag and a retrigger key — bumping it
+  // on rapid re-taps re-runs the dismiss effect with a fresh timeout.
+  const [addedAt, setAddedAt] = useState(0);
+  const showAddedToast = addedAt > 0;
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', id],
@@ -54,6 +63,12 @@ export default function ProductPage() {
       tg?.BackButton.hide();
     };
   }, [navigate]);
+
+  useEffect(() => {
+    if (!showAddedToast) return;
+    const timer = setTimeout(() => setAddedAt(0), ADDED_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [addedAt, showAddedToast]);
 
   if (isLoading) {
     return <ProductSkeleton />;
@@ -80,24 +95,40 @@ export default function ProductPage() {
 
   const handleAdd = () => {
     addItem(product, quantity);
-    setAdded(true);
-    setTimeout(() => setAdded(false), ADDED_FEEDBACK_MS);
+    setAddedAt(Date.now());
+  };
+
+  const handleGoToCart = () => {
+    setAddedAt(0);
+    navigate('/cart');
   };
 
   return (
     <div className="pb-6">
-      {/* Image */}
-      {product.imageUrl ? (
-        <img
-          src={product.imageUrl}
-          alt={product.name}
-          className="w-full h-64 object-cover bg-tg-secondary"
-        />
-      ) : (
-        <div className="w-full h-64 bg-dorify-primary-light flex items-center justify-center">
-          <IconPackage width={64} height={64} className="text-dorify-primary" />
-        </div>
-      )}
+      {/* Image with floating back button — TG BackButton API doesn't
+          activate on all clients, so we render our own as belt-and-suspenders.
+          Without this, ProductPage has no escape (Tabbar hidden by Layout). */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          aria-label="Назад"
+          className="absolute top-3 left-3 z-10 w-10 h-10 rounded-full bg-tg-bg/80 backdrop-blur shadow-card flex items-center justify-center active:scale-95"
+        >
+          <IconChevronRight width={20} height={20} className="rotate-180" />
+        </button>
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="w-full h-64 object-cover bg-tg-secondary"
+          />
+        ) : (
+          <div className="w-full h-64 bg-dorify-primary-light flex items-center justify-center">
+            <IconPackage width={64} height={64} className="text-dorify-primary" />
+          </div>
+        )}
+      </div>
 
       <div className="p-4">
         {/* Name & Price */}
@@ -192,7 +223,7 @@ export default function ProductPage() {
               onClick={handleAdd}
               className="!bg-dorify-primary"
             >
-              {added ? (
+              {showAddedToast ? (
                 <span className="inline-flex items-center gap-1.5">
                   <IconCheck width={18} height={18} />
                   Добавлено
@@ -204,6 +235,29 @@ export default function ProductPage() {
           </div>
         )}
       </div>
+
+      {/* Added-to-cart toast — Tabbar is hidden on /product/*, so cart badge
+          increment is invisible to the user. This is the primary feedback. */}
+      {showAddedToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-4 inset-x-4 z-50 bg-tg-section shadow-card rounded-card p-3 flex items-center gap-3"
+          style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="w-9 h-9 rounded-full bg-dorify-success-light text-dorify-success flex items-center justify-center shrink-0">
+            <IconCheck width={20} height={20} />
+          </div>
+          <Text className="flex-1">Добавлено в корзину</Text>
+          <button
+            type="button"
+            onClick={handleGoToCart}
+            className="text-dorify-primary font-medium px-3 py-1.5 active:opacity-80"
+          >
+            Перейти
+          </button>
+        </div>
+      )}
     </div>
   );
 }
