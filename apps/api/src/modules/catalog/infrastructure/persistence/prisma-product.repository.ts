@@ -56,7 +56,16 @@ export class PrismaProductRepository implements ProductRepository {
     filters: ProductListFilters,
     pagination: PaginationDto,
   ): Promise<PaginatedResult<Product>> {
-    const where = this.buildWhere({ ...filters, status: 'PUBLISHED', isAvailable: true });
+    // Public listings join on Pharmacy to hide products of pharmacies that are
+    // either pending verification or deactivated. Pharmacy-owner views
+    // (findByPharmacyId) skip this filter so the owner sees their own catalog
+    // regardless of verification state. Post-moderation MVP requirement.
+    const where = this.buildWhere({
+      ...filters,
+      status: 'PUBLISHED',
+      isAvailable: true,
+      requireActivePharmacy: true,
+    });
 
     const [records, total] = await Promise.all([
       this.prisma.product.findMany({
@@ -132,13 +141,18 @@ export class PrismaProductRepository implements ProductRepository {
     });
   }
 
-  private buildWhere(filters: ProductListFilters & { pharmacyId?: string }): Prisma.ProductWhereInput {
+  private buildWhere(
+    filters: ProductListFilters & { pharmacyId?: string; requireActivePharmacy?: boolean },
+  ): Prisma.ProductWhereInput {
     const where: Prisma.ProductWhereInput = { deletedAt: null };
 
     if (filters.pharmacyId) where.pharmacyId = filters.pharmacyId;
     if (filters.status) where.status = filters.status as ProductStatus;
     if (filters.isAvailable !== undefined) where.isAvailable = filters.isAvailable;
     if (filters.category) where.category = filters.category;
+    if (filters.requireActivePharmacy) {
+      where.pharmacy = { isActive: true, isVerified: true };
+    }
     if (filters.search) {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },

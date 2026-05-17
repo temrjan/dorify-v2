@@ -44,6 +44,12 @@ export const ModerateProductSchema = z.object({
 
 export type ModerateProductDto = z.infer<typeof ModerateProductSchema>;
 
+export const HideProductSchema = z.object({
+  reason: z.string().min(1).max(500),
+});
+
+export type HideProductDto = z.infer<typeof HideProductSchema>;
+
 export const ProductFiltersSchema = z.object({
   category: z.string().optional(),
   search: z.string().optional(),

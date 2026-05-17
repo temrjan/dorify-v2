@@ -283,14 +283,37 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
               status={initialProduct.status}
               moderationNote={initialProduct.moderationNote}
             />
-            {initialProduct.status === 'REJECTED' && initialProduct.moderationNote && (
+            {initialProduct.status === 'HIDDEN' && initialProduct.moderationNote && (
               <Text className="text-xs text-dorify-error block mt-1">
-                {initialProduct.moderationNote}
+                Скрыт модератором: {initialProduct.moderationNote}
               </Text>
             )}
           </div>
         )}
       </div>
+
+      {/* Rules notice — post-moderation MVP: товар сразу публикуется,
+          но модератор может скрыть при нарушении правил. Показываем при
+          создании нового товара (не при редактировании). */}
+      {!isEdit && (
+        <div className="mt-3 bg-dorify-warning-light text-dorify-warning rounded-card p-3 flex items-start gap-2">
+          <IconAlert width={18} height={18} className="shrink-0 mt-0.5" />
+          <Text className="text-sm">
+            Опубликовав товар, вы соглашаетесь с{' '}
+            <a
+              href="/rules"
+              className="font-medium underline"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/rules');
+              }}
+            >
+              Правилами публикации
+            </a>
+            . Администратор может скрыть товар при нарушении.
+          </Text>
+        </div>
+      )}
 
       {/* Errors summary */}
       {errorCount > 1 && (

@@ -5,8 +5,10 @@ import { languageKeyboard, roleKeyboard, webAppKeyboard } from '../keyboards';
 
 export interface SessionData {
   lang?: Lang;
-  /** When admin clicks «Reject» — pharmacyId awaiting reason text. */
+  /** When admin clicks «Reject» on a pharmacy — pharmacyId awaiting reason text. */
   pendingRejectPharmacyId?: string;
+  /** When admin clicks «Скрыть» on a product — productId awaiting reason text. */
+  pendingHideProductId?: string;
 }
 
 export type BotContext = Context & SessionFlavor<SessionData>;
