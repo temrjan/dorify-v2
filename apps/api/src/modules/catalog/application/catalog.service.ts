@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { generateId } from '@shared/domain';
+import { generateId, STORAGE_PORT } from '@shared/domain';
+import type { StoragePort } from '@shared/domain';
 import { PRODUCT_REPOSITORY } from '../domain/repositories/product.repository';
 import type { ProductRepository } from '../domain/repositories/product.repository';
 import { Product } from '../domain/entities/product.entity';
@@ -24,6 +25,7 @@ export class CatalogService {
 
   constructor(
     @Inject(PRODUCT_REPOSITORY) private readonly productRepo: ProductRepository,
+    @Inject(STORAGE_PORT) private readonly storage: StoragePort,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -173,13 +175,17 @@ export class CatalogService {
   /**
    * Post-moderation takedown: admin hides a PUBLISHED product (e.g. for
    * violating publication rules). Reason is stored on product.moderationNote
-   * and forwarded to the owner via DM.
+   * and forwarded to the owner via DM. The uploaded image is removed from
+   * disk since hidden-by-rules content typically shouldn't keep occupying
+   * storage (and may itself be the violation, e.g. inappropriate photo).
    */
   async hideProductByAdmin(productId: string, moderatorId: string, dto: HideProductDto): Promise<ProductResponse> {
     const product = await this.productRepo.findById(productId);
     if (!product) {
       throw new NotFoundException(`Product ${productId} not found`);
     }
+
+    const imageUrl = product.imageUrl;
 
     product.hideByAdmin(moderatorId, dto.reason);
     await this.productRepo.save(product);
@@ -191,6 +197,8 @@ export class CatalogService {
       reason: dto.reason.trim(),
     }));
 
+    await this.cleanupImage(imageUrl);
+
     return this.toResponse(product);
   }
 
@@ -198,11 +206,37 @@ export class CatalogService {
     const pharmacyId = TenantContext.requirePharmacyId();
     const product = await this.findOwnedProduct(productId, pharmacyId);
 
+    // Capture before mutation — hide() doesn't touch imageUrl but a future
+    // change might.
+    const imageUrl = product.imageUrl;
+
     if (product.isPublished()) {
       product.hide();
     }
 
     await this.productRepo.save(product);
+
+    // Pharmacy-initiated delete = clear intent to drop the product. Files
+    // produced by /uploads (api.dorify.uz/uploads/products/...) are removed
+    // from disk; external URLs are no-op (storage adapter rejects URLs
+    // outside its base).
+    await this.cleanupImage(imageUrl);
+  }
+
+  /**
+   * Best-effort image cleanup. Storage adapter is defensive (refuses URLs
+   * outside its base, swallows ENOENT, validates traversal) — but we still
+   * try/catch so a flaky disk doesn't fail the catalog operation that
+   * already committed.
+   */
+  private async cleanupImage(imageUrl: string | undefined): Promise<void> {
+    if (!imageUrl) return;
+    try {
+      await this.storage.delete(imageUrl);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Image cleanup failed for ${imageUrl}: ${message}`);
+    }
   }
 
   private emit(event: { eventName: string }): void {

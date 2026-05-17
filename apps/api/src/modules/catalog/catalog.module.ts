@@ -5,8 +5,10 @@ import { AdminBotProductController } from './infrastructure/controllers/admin-pr
 import { PrismaProductRepository } from './infrastructure/persistence/prisma-product.repository';
 import { PRODUCT_REPOSITORY } from './domain/repositories/product.repository';
 import { ServiceTokenGuard } from '../iam/infrastructure/guards/service-token.guard';
+import { StorageModule } from '@shared/infrastructure/storage/storage.module';
 
 @Module({
+  imports: [StorageModule],
   controllers: [
     PublicProductController,
     PharmacyProductController,
