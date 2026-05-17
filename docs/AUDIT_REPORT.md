@@ -5,11 +5,17 @@
 **Scope:** Backend API, Frontend Web, Telegram Bot, Infrastructure, Security
 **Branch:** `main`
 
-## Status summary (2026-05-14)
+## Status summary (2026-05-17, Session 10 close)
 
-**Claude Code original audit — critical+high closed: 12/12** (all actionable items, S-CRIT-2 partial по design — JWT для Admin SPA = Phase 8).
+**Claude Code original audit — critical+high closed: 12/12** (all actionable items, S-CRIT-2 partial по design — JWT для Admin SPA = future).
 
-**Kimi K2.6 audit — critical+high closed: 7/7 closable items** (5 critical: #54 #55 #56 #59 #60, 2 high: #57 #62 #61). Remaining 4 high — backlog architectural: S-HIGH-9 outbox, S-HIGH-11 persistent session, S-HIGH-13 upload throttle. Medium: 4/8 closed (#58 #60 #61 #63), 4 backlog.
+**Kimi K2.6 audit — critical+high closed: 8/9 closable items.** S-HIGH-13 (upload throttling) — **CLOSED Session 10 PR #74** via `UserOrIpThrottlerGuard` + `@Throttle(10/min)` на `POST /uploads/image`. Remaining: S-HIGH-9 outbox, S-HIGH-11 bot persistent session. Medium: 5/8 closed, 3 backlog (S-MED-4/5/7/10).
+
+**Session 10 additional hardening (PR #72-74):**
+- `findPublished` join'ит pharmacy.isActive+isVerified — unverified-pharmacy products не утекают buyer'ам.
+- Storage cleanup on `deleteProduct` + `hideProductByAdmin` — нет orphan-files growth от moderation workflow.
+- Per-scope auth `scope=products` → PHARMACY_OWNER only — buyer-side abuse of products storage невозможен.
+- Per-user upload throttle 10/min (CGNAT-safe via user.id).
 
 **Combined audit critical+high status (2026-05-14): 16/16 closable findings closed.**
 
@@ -55,7 +61,7 @@ Captain заказал independent audit от Kimi K2.6 (Chinese model). Най�
 | **S-HIGH-10** | Multicard callback missing amount cross-check | ✅ closed (defense-in-depth) | #57 |
 | **S-HIGH-11** | Bot in-memory session lost on restart | ⏳ backlog (Redis либо Prisma session store) |  |
 | **S-HIGH-12** | Health check не validates DB connectivity | ✅ closed (Promise.race + 2s timeout) | #62 |
-| **S-HIGH-13** | Upload endpoint unbounded disk-exhaustion vector | ⏳ backlog (ThrottlerModule + per-user quota) |  |
+| **S-HIGH-13** | Upload endpoint unbounded disk-exhaustion vector | ✅ closed (`UserOrIpThrottlerGuard` + `@Throttle(10/min)` per-user) | #74 |
 
 ### Medium
 

@@ -1,14 +1,16 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-17** (Session 9 close — issue #66 closed (Cart React #185 root-caused + fixed); ProductPage UX перепроектирован под Uzum-style sticky bottom action bar).
+> Updated: **2026-05-17** (Session 10 close — pipeline аптека → товар → buyer закрыт end-to-end: post-moderation, product image upload, upload hardening).
+>
+> **Контекст-факт критический:** v1 dorify **никогда не вышел в продакшен**. Нет users для миграции. v2 — greenfield product, не cutover. См. memory `project_v1_never_launched_launch_strategy.md`.
 
 ---
 
 ## ⚡ TL;DR
 
-**Project:** Multi-tenant аптечный маркетплейс (Telegram Mini App). Миграция Express MVC v1 → NestJS DDD v2.
-**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz` (main=`3960b4e`). Buyer flow **разблокирован** — production blocker #66 закрыт; ErrorBoundary + hidden sourcemaps wired-up; ProductPage с sticky bottom action bar.
+**Project:** Multi-tenant аптечный маркетплейс (Telegram Mini App). v2 — greenfield, не миграция с v1 (v1 не launched).
+**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz` (main=`5469697`). **MVP pipeline закрыт end-to-end:** pharmacy registers → admin DM approves → owner adds products (auto-publish с image upload с телефона) → buyer views → cart → inquiry/checkout → DM продавцу. Multicard live smoke остался (требует test merchant creds).
 **Captain language:** русский, directive-style. Устаёт от ceremony. **Sequential strictly** — не запускать parallel tool calls.
 **Last sessions shipped:**
 - Session 2 (2026-05-08, 6 PR #5–#10): payment frontend flow, pharmacy CRUD, CI/bot/CORS fixes.
@@ -18,15 +20,22 @@
 - Session 6 (2026-05-11, 11 PR #48–#58): Phase 1 seller-side + Phase 2 customer notifications + Kimi audit Tier A.
 - Session 7 (2026-05-14, 5 PR #59–#63): Kimi K2.6 audit Tier B полностью closed; audit critical+high закрыт 16/16 closable.
 - Session 8 (2026-05-15, 1 PR #65): hotfix-попытка `useShallow(selectItemsByPharmacy)` на /cart white screen — **не помог**. Issue #66 открыт с full diagnosis; Captain: «откроешь issue, в другой сессии пофиксим».
-- **Session 9 (2026-05-17, 4 PR #67–#70):**
+- Session 9 (2026-05-17, 5 PR #67–#71): ErrorBoundary surfaced React #185 → drop unstable Map selector closes #66; ProductPage UX — visible back button + Uzum-style sticky bottom action bar; docs Session 9 close.
+- **Session 10 (2026-05-17, 3 PR #72–#74):**
+  - **PR #72 post-moderation для products.** Pre-moderation flow (DRAFT → PENDING_MODERATION → admin SPA action → PUBLISHED) держал товары в подвешенном состоянии — нет admin SPA, нет caller'а на JWT endpoint. Switch: pharmacies pre-verified at registration → auto-publish. Admin скрывает постфактум через bot DM. New `Product.autoPublish()` + `hideByAdmin(moderatorId, reason)`; new `AdminBotProductController` под `@Public + ServiceTokenGuard`; new `ProductNotificationHandler` (DM admin при создании с кнопкой «🗑 Скрыть», DM аптеке при hide с причиной); `findPublished` теперь join'ит `Pharmacy.isActive: true, isVerified: true` чтобы unverified-pharmacy товары не утекали buyer'ам; bot session mutual exclusion между pharmacy-reject и product-hide reason flows. New `RulesPage` at `/rules` + `docs/PRODUCT_RULES.md` source of truth.
+  - **PR #73 product image upload + per-scope auth gate.** ProductFormPage был text URL field — аптека не могла загрузить фото с телефона. New shared `ImageUploadField` (`scope: 'logos' | 'products'`) заменяет старый `LogoUpload` + добавляется в ProductFormPage. Backend: `UploadsService` per-scope auth — `scope=products` требует `TenantContext.requirePharmacyId()` (PHARMACY_OWNER only); `scope=logos` остаётся открыт для wizard pre-promotion path. `UploadsService.uploadImage` теперь async.
+  - **PR #74 upload hardening (cleanup + throttle).** Image cleanup на `deleteProduct` и `hideProductByAdmin` через `StoragePort` inject в `CatalogService` (best-effort, swallows storage failures). Per-user (fallback IP) throttle 10/min на `POST /uploads/image` через новый `UserOrIpThrottlerGuard extends ThrottlerGuard` — CGNAT-safe.
+- **Session 9 detail (для контекста PRs #67-#70):**
   - **PR #67** — `ErrorBoundary` обёрнут вокруг `<AppRouter/>` в Layout + `vite build.sourcemap: 'hidden'` + `console.error('[DORIFY-CRASH]', ...)` tag. Surfaced real error в production smoke fallback UI: **`Minified React error #185`** (Maximum update depth exceeded).
   - **PR #68 closes #66.** Root cause: `selectItemsByPharmacy` строил new `Map<string, CartItem[]>` с новыми inner arrays на каждом вызове → `useShallow` shallow-equality на Map entries делает `Object.is` на inner array refs → never stabilizes → React 19 throws #185. PR #65 (useShallow wrap) не помог потому что нестабильность была *внутри* Map. Fix: убрать broken selector, подписываться на стабильный `items` ref + derive view через `useMemo([items])`. CartPage строит Map локально, Checkout/Inquiry collapse к `items.filter(...)`. Drive-by: navigate-during-render в Checkout/Inquiry → `useEffect`.
   - **PR #69** — ProductPage UX iter 1: visible in-page back button (TG BackButton API не активирует chrome-стрелку на mobile platform Captain'а) + bottom toast с CTA «Перейти» 2s.
   - **PR #70** — ProductPage UX iter 2 (per Captain Uzum-reference): **sticky bottom action bar** с морфом. Не в корзине → full-width «В корзину». В корзине → `[−] N [+]` stepper + «🛒 Перейти». Quantity sourced from cartStore (single source of truth). Tap «−» при N=1 → cartStore auto-removeItem → bar reverts. Removed: local quantity state, inline «Количество + Итого + Button» блок, toast.
 
-**Production live:** buyer flow прошёл smoke 2026-05-17: HomePage → Catalog → ProductPage (с back-button + sticky bar морф) → Cart (рендерится без white screen, никаких infinite-loop) → Checkout/Inquiry. Profile тоже работает (был collateral broken, починился сам после fresh TWA + новый bundle).
-**Memory saved:** `feedback_react19_zustand_selectors.md` — никогда не строить collections в zustand selector body; использовать `useMemo` в компоненте.
-**Next session entry point:** Phase 3 bot UX polish (~30 мин), либо Phase 7 Search/Avi (~5-7 дней), либо Tier C backlog (S-HIGH-9 outbox, S-HIGH-11 bot persistent session, payment.failed flow), либо migration v1→v2 (~1 неделя). Captain's call.
+**Production live (verified 2026-05-17):** TL;DR pipeline works end-to-end except live Multicard payment. **199 unit tests pass.** Real product photos can be uploaded from phone. Bot moderation DMs work both directions (admin → owner approve/reject pharmacy, admin → owner hide product, owner → admin new-pharmacy/new-product notifications). Per-user upload rate-limited 10/min.
+**Memory saved:**
+- `feedback_react19_zustand_selectors.md` — never build collections in zustand selector body (use `useMemo` in component).
+- `project_v1_never_launched_launch_strategy.md` — v1 not launched; no migration; MVP scope per Captain.
+**Next session entry point options:** (a) Multicard live smoke — нужны test merchant creds (`dev-mesh.multicard.uz` sandbox или prod creds на мин-сумму), ~30 мин config + 1-2ч end-to-end smoke; (b) Phase 3 bot UX polish (`pendingRejectAt` timeout + friendly admin race, ~30 мин); (c) Phase 7 Search/Avi (pgvector AI semantic search, ~5-7 дней); (d) remaining Tier C audit (S-HIGH-9 outbox pattern, S-HIGH-11 bot persistent session). Captain's call.
 
 ---
 
@@ -263,6 +272,44 @@ Total backend tests: **189** (was 175 — 14 new + 1 expand). Frontend tests: st
 6. **Migration verification (PR #63)** (~10 мин) — Captain «проверь миграцию применилась». SSH 7demo → `docker compose exec dorify-backend npx prisma migrate status` → «Database schema is up to date!». `docker exec postgres psql ... \d "Payment"` показал новый `Payment_status_provider_createdAt_idx`. `EXPLAIN` reconcile query → `Index Scan using Payment_status_provider_createdAt_idx`. Confirmation. **Note:** Postgres контейнер на 7demo называется просто `postgres` (pgvector image), не часть dorify compose stack — host shared между проектами (aqllify-db, ledger-ai-postgres, postgres).
 
 7. **Session close** — Captain «обнови документацию и закрой сессию». Handoff + AUDIT_REPORT + state.json + memory обновлены. Docs committed через PR (Session 5 pattern).
+
+## Что отгружено в Session 10 (2026-05-17) — pipeline аптека→товар→buyer закрыт + upload hardening
+
+3 PRs (#72-#74). Production main=`5469697`. Tests 191→199.
+
+### PR breakdown
+
+| PR | Что | LOC | Tests |
+|----|-----|-----|-------|
+| #72 | post-moderation для products + admin hide via bot + rules doc | +605/-23 | +5 domain |
+| #73 | product image upload + per-scope auth gate | +167/-65 | +4 service |
+| #74 | upload hardening — cleanup on delete + per-user throttle | +197/-3 | +4 service |
+
+### Хроника
+
+1. **Pipeline audit (intake)** — Captain «нужно закончить полностью и подтвердить пайплайн регистрации аптеки + добавление товаров». E2E probe выявил **критический gap:** product moderation flow не работает end-to-end. Аптека регистрируется ✅ → admin DM ✅ → owner DM ✅ → panel ✅ → add product → `PENDING_MODERATION` ❌ stuck navсегда (нет admin SPA, JWT endpoint без caller'а).
+
+2. **PR #72 post-moderation switch.** Captain «на первом этапе всё упростить, пост модерация. Аптеку верифицировали, пусть добавляет товары. При добавлении показать предупреждение что модератор может удалить». Mirror того же flow что для pharmacy approval, но **зеркально** — auto-publish с notification и option to hide. `Product.autoPublish()` + `hideByAdmin`; `AdminBotProductController` под service token; `ProductNotificationHandler` (DM admin при создании + кнопка «🗑 Скрыть», DM аптеке при hide). `findPublished` теперь join на pharmacy.isActive+isVerified (review caught: unverified pharmacy products утекали buyer'ам). Bot session mutual exclusion (review caught: race между pharmacy-reject и product-hide reason flows мог тихо скрыть товар). New `RulesPage` at `/rules` + `docs/PRODUCT_RULES.md`. /security-review clean.
+
+3. **PR #73 image upload audit + fix.** Captain «нужно проверить загрузку изображения». Audit показал: backend готов (`StoragePort` + sharp + magic bytes + path traversal defense), но `ProductFormPage` имеет только text URL input — реальная аптека на телефоне не может вставить URL. Плюс `POST /uploads/image` guarded только глобальным `TelegramAuthGuard` — любой Telegram user (включая buyer'ов) может писать в `scope=products`. /selfcheck поймал critical: `@Roles(PHARMACY_OWNER)` на UploadsController сломал бы wizard logo (user ещё USER до register). Fix: **per-scope auth в service** — `scope=products` → `TenantContext.requirePharmacyId()`, `scope=logos` open. New `ImageUploadField` shared компонент (scope-параметризован), заменил старый `LogoUpload` во всех 3 callsite'ах. /selfcheck: skip optional Zod URL validation (ломала бы edit legacy seed products с external URLs).
+
+4. **PR #74 upload hardening.** Captain «давай сделаем» PR-2 backlog: orphan files + rate limit. CatalogService injects `StoragePort` → `cleanupImage()` на `deleteProduct` (clear pharmacy intent = drop file) + `hideProductByAdmin` (violation content). Best-effort с logger.warn (storage failure не фейлит catalog op). `UserOrIpThrottlerGuard extends ThrottlerGuard` с `getTracker` returning `user:${id}` (fallback `ip:`) — CGNAT-safe. Apply 10/min локально на `POST /uploads/image` (не global APP_GUARD — не трогаем другие endpoint'ы). Reviewers оба `[]` clean.
+
+### Tests added Session 10
+
+- `apps/api/src/modules/catalog/__tests__/domain.spec.ts` — +5 (autoPublish happy/error, hideByAdmin happy/wrong-status/empty-reason)
+- `apps/api/src/modules/uploads/__tests__/uploads.service.spec.ts` — +4 (unknown scope BadRequest, logos без context, products без pharmacyId Forbidden, products с pharmacyId)
+- `apps/api/src/modules/catalog/__tests__/catalog.service.spec.ts` — +4 (deleteProduct cleanup happy, no-imageUrl skip, storage failure swallow, hideByAdmin cleanup)
+
+### Process refinements Session 10
+
+- **`/selfcheck` caught critical** в обоих major PRs — auth-gap fix design ошибка (PR #73) и плохой scope (PR #74). Reviewers поймали 2 important (PR #72) + 0 на PR #73/74. Pattern: для multi-component features `/selfcheck` приносит больше чем `/check` или `/review` потому что ловит design-level errors до coding.
+- **Rules как source of truth в двух местах** (markdown + React page) — sync manually для MVP. В будущем markdown-loader. Зафиксировано в docs/PRODUCT_RULES.md «Как изменить эти правила».
+- **Per-scope authorization внутри service** > роль на контроллере — когда один endpoint обслуживает несколько call-context'ов (logos для USER в wizard, products для PHARMACY_OWNER в panel). Сохраняем endpoint cohesion, защищаем сквозь tenant context.
+
+### Buyer flow smoke (Session 10 prep)
+
+Captain запустил Block 5 buyer flow smoke (pending с Session 5) — состояние БД на момент smoke: 2 verified+active pharmacies (Дорифай Демо + Тест Аптека 2), 2 PUBLISHED products, обе аптеки **без Multicard credentials** → smoke идёт через inquiry path (не checkout). Multicard live smoke остался — требует test merchant creds.
 
 ## Что отгружено в Session 6 (2026-05-11) — Phase 1 seller-side + Phase 2 customer notifications + Kimi audit Tier A
 
@@ -615,12 +662,13 @@ Codex стандарты в `~/Codex/standards/`:
 
 ## Open decisions (Captain's pending)
 
-1. **Multicard architectural pivot** — per-pharmacy merchant (current) vs platform-as-merchant + split. Captain выбрал pivot 2026-05-08, **поставил Multicard на паузу** до получения операционных ответов от Multicard support (PDF inquiry на `~/Desktop/marketplace-payment-inquiry.pdf`). См. `docs/multicard-1/README.md`.
-2. **Admin SPA** — строить заново vs адаптировать v1.
-3. **Pharmacy registration mechanism** — Bot wizard (Grammy conversations) основной канал. Web-based registration через TMA — открытый.
-4. **Migration v1→v2** — extraction скрипт. План на отдельный sprint в Phase 8.
+1. ~~**Multicard architectural pivot**~~ — **CLOSED 2026-05-17**: Captain «без split». Используем стандартный per-pharmacy merchant model. Memory: `project_v1_never_launched_launch_strategy.md`.
+2. **Admin SPA** — defer. Captain ops через bot DM (pharmacy approve/reject + product hide). Когда нужен будет (>5 аптек, payment analytics) — построить минимальный (3-4 экрана: moderation queue, pharmacy verification, orders view).
+3. **Pharmacy registration mechanism** — **CLOSED**: Bot `/start` → роль «Я аптека» → opens TWA `/become-pharmacy` (4-step wizard). Логотип uploads в Step 2 (scope=logos, USER role pre-promotion).
+4. ~~**Migration v1→v2**~~ — **CLOSED 2026-05-17**: v1 не launched, нет данных, нет миграции.
 5. **Backend strict category enforcement** — backend сейчас permissive (любая string). UI master list — только UI enforcement. Если хочется strict — backend `category: z.enum(...)` + migration. Decide когда понадобится.
 6. **Расширение master categories list** — 15 категорий покрывают MVP. Если pharmacy онбординг покажет gaps (новые типы товаров) — добавить через PR в `apps/web/src/shared/constants/categories.ts`.
+7. **Multicard live smoke** — pending test merchant creds. Pipeline готов (PR #4 adapter + PR #6 frontend + PR #51 per-pharmacy creds editor), но live end-to-end (buyer → real payment → callback → Order PAID + DM) ни разу не прогонялся в v2.
 
 ## Captain decisions log (closed по 2026-05-09)
 
@@ -675,38 +723,46 @@ Codex стандарты в `~/Codex/standards/`:
 
 ---
 
-## ⏭ Next session (Session 8) — entry point
+## ⏭ Next session (Session 11) — entry point
 
-**Captain в финале Session 7:** «обнови документацию и закрой сессию». **Все Kimi K2.6 critical+high closable findings closed (16/16).** Остаются Tier C backlog medium-architectural items + low tech-debt + неполный buyer smoke. Phase 7 Search/Avi всё ещё untackled.
+**Captain в финале Session 10:** «обнови документацию... клинап». **MVP pipeline закрыт end-to-end** (Session 10). Multicard live smoke остался как единственный pending для full validation.
 
-### Опция A — Phase 3 bot UX polish (~30 мин, 1 PR)
+### Опция A (Recommended) — Multicard live smoke
 
-Self-contained backlog item, легко close'нуть в начале сессии:
+Pipeline готов end-to-end (PR #4 adapter + PR #46 retry + PR #6 frontend + PR #51 per-pharmacy creds + PR #57 amount cross-check + atomic stock restore + status DMs), но **никогда не прогонялся live в v2**.
+
+Setup:
+1. Captain получает test merchant credentials (либо sandbox `dev-mesh.multicard.uz`, либо prod merchant с минимальной суммой)
+2. В bot → панель аптеки → «Настройки оплаты» → вводит credentials
+3. Buyer (любой Telegram account, не PHARMACY_OWNER) добавляет в cart товар этой аптеки → Cart показывает «💳 Оплатить · X сум» (вместо «💬 Отправить заявку»)
+4. Tap → /checkout → форма → submit → Multicard checkoutUrl открывается через `window.location.assign`
+5. Реальная оплата (test card) → Multicard callback → `processCallback` verify signature + amount + markPaidAtomically → Order PAID → buyer DM
+6. Verify: order.status = PAID, payment.status = PAID, buyer получил «💳 Оплата прошла», аптека получила «🆕 Заказ оплачен»
+
+~30 мин config + 1-2ч smoke + fix anything that breaks. После этого — MVP полностью валидирован.
+
+### Опция B — Phase 3 bot UX polish (~30 мин, 1 PR)
+
+Self-contained backlog item:
 - `pendingRejectAt` timestamp в bot session + 5-min auto-clear (gidstroy advisory #3 + Kimi S-MED-8 overlap)
 - Friendly «Уже обработано другим админом» вместо raw DomainError text (gidstroy advisory #4 + Kimi race fix)
 
-### Опция B — Phase 7 Search/Avi (~5-7 дней, многоэтапный sprint)
+### Опция C — Phase 7 Search/Avi (~5-7 дней, многоэтапный sprint)
 
-Qdrant→pgvector переход (Captain decision на pgvector closed), Product events chain, AI search UI. Самый крупный остающийся feature scope.
+Qdrant→pgvector переход (closed на pgvector), Product events chain (`product.created` уже эмитится с Session 10!), AI search UI. Самый крупный feature scope. Differentiator vs Uzum/Yandex для public launch.
 
-### Опция C (Recommended after Tier B) — Tier C backlog architectural
+### Опция D — Tier C backlog architectural
 
-Medium-size architectural items:
-- **S-HIGH-9 Outbox pattern** — In-memory EventEmitter crash silence. Либо outbox table в DB либо Redis Streams. **Multi-day work** — proper design ceremony нужен.
-- **S-HIGH-11 Bot persistent session** — Redis либо Prisma session store. **Medium work** (~1 day).
-- **S-HIGH-13 Upload throttling** — ThrottlerModule + per-user quota. **Small** (~2 hours).
+- **S-HIGH-9 Outbox pattern** — In-memory EventEmitter crash silence. Сейчас при crash между save и DM-emit события теряются (buyer не получит уведомление о статусе, admin не узнает про новый товар). Multi-day work (DB outbox table или Redis Streams). Production-resilience must-have перед launch с реальной нагрузкой.
+- **S-HIGH-11 Bot persistent session** — Redis либо Prisma session store. Сейчас bot wizard теряет state при рестарте. Medium work (~1 day).
 - **S-MED-4 + S-MED-5 payment.failed flow** — markPaymentFailed wire + buyer notification handler.
-- **S-MED-7 Phone format alignment** — UZ-only enforce либо international parity между frontend/backend.
+- **S-MED-7 Phone format alignment** — UZ-only enforce либо international parity.
 - **S-MED-10 Swagger wiring** — SwaggerModule.setup() behind admin guard.
-- **S-LOW-1 i18n bootstrap** — react-i18next setup, всё UI strings в ключах.
+- **S-LOW-1 i18n bootstrap** — react-i18next setup.
 
-### Опция D — Buyer-side smoke (~15 мин)
+### Опция E — Frontend polish
 
-Session 5 Block 5 (buyer flow) **до сих pending**. Captain не приоритизировал ни в Session 6, ни в Session 7. Может пройти сейчас за 15 мин с новыми статусами + buyer DMs + новый PublicPharmacyResponse + atomic stock restore. Хорошая verification что вся Tier B работа реально не сломала flow.
-
-### Опция E — Migration v1→v2 (~1 неделя)
-
-`docs/DORIFY_V2_DDD.md §10` Phase 8 — данные production v1. Полностью untackled, но критично перед cutover. Скрипт extraction users / pharmacies / products / orders / payments + re-encrypt Multicard secrets.
+OrdersPage redesign (последняя buyer page в старом стиле). Минорный visual polish Checkout/PaymentResult.
 
 ---
 
@@ -720,10 +776,18 @@ Session 5 Block 5 (buyer flow) **до сих pending**. Captain не приор�
 - `src/modules/{iam,catalog,ordering,payment,search,notification}/` — bounded contexts
 - `src/modules/payment/infrastructure/multicard/multicard.adapter.ts` — Multicard HTTP интеграция (без retry/idempotency-key — см. multicard-1 README)
 - `src/modules/payment/application/payment.service.ts` — createInvoice + processCallback (race-fix через markPaidAtomically)
-- `src/modules/catalog/application/catalog.service.ts` — Pharmacy CRUD; `getMyProduct` (PR #8)
-- `src/modules/catalog/infrastructure/controllers/product.controller.ts` — Public/Pharmacy/Admin controllers
-- `src/shared/infrastructure/tenant/tenant.context.ts` — AsyncLocalStorage tenant scoping
-- `prisma/schema.prisma` — schema
+- `src/modules/catalog/application/catalog.service.ts` — products CRUD; **post-moderation MVP (PR #72)**: `createProduct` теперь `autoPublish()` + emit `ProductCreatedEvent`. `hideProductByAdmin(id, moderatorId, reason)` для bot DM takedown + `ProductHiddenByAdminEvent`. Injects `StoragePort` (PR #74) — `cleanupImage()` вызывается на `deleteProduct` + `hideByAdmin` (best-effort).
+- `src/modules/catalog/infrastructure/controllers/product.controller.ts` — Public/Pharmacy/Admin controllers (JWT, не используется без admin SPA).
+- `src/modules/catalog/infrastructure/controllers/admin-product.controller.ts` — **NEW (PR #72)**: `AdminBotProductController` под `@Public + ServiceTokenGuard` для bot DM takedown. `POST /admin/products/:id/hide`.
+- `src/modules/catalog/infrastructure/persistence/prisma-product.repository.ts` — `findPublished`/`findPublishedByPharmacy` join'ит `Pharmacy.isActive: true, isVerified: true` (PR #72) чтобы unverified-pharmacy товары не утекали buyer'ам.
+- `src/modules/catalog/domain/entities/product.entity.ts` — state machine с двумя путями: pre-moderation (`submitForModeration` → `publish`/`reject`, preserved для future opt-in) и post-moderation (`autoPublish` для DRAFT → PUBLISHED, `hideByAdmin(moderatorId, reason)` для PUBLISHED → HIDDEN). Owner-initiated `hide()` остаётся отдельным.
+- `src/modules/notification/application/event-handlers/on-product-events.handler.ts` — **NEW (PR #72)**: `ProductNotificationHandler`. `onProductCreated` → DM admins «🆕 Новый товар» с кнопкой «🗑 Скрыть». `onProductHiddenByAdmin` → DM owner «🚫 Товар скрыт» с причиной. Все user-controlled strings через `escapeHtml`.
+- `src/modules/uploads/application/uploads.service.ts` — async; `scope=products` требует `TenantContext.requirePharmacyId()` (PR #73). `scope=logos` open для wizard pre-promotion.
+- `src/modules/uploads/infrastructure/uploads.controller.ts` — `POST /uploads/image` под `@UseGuards(UserOrIpThrottlerGuard) + @Throttle({ default: { limit: 10, ttl: 60_000 } })` (PR #74).
+- `src/shared/infrastructure/throttle/user-or-ip-throttler.guard.ts` — **NEW (PR #74)**: extends @nestjs/throttler v6 `ThrottlerGuard`, `getTracker` возвращает `user:${req.user.id}` (fallback `ip:`). CGNAT-safe per-user rate limiting.
+- `src/shared/infrastructure/storage/local-disk-storage.adapter.ts` — magic-bytes + sharp resize 1200px + EXIF strip + WebP q=82 + path-traversal-safe `delete()`.
+- `src/shared/infrastructure/tenant/tenant.context.ts` — AsyncLocalStorage tenant scoping. `requirePharmacyId()` throws `ForbiddenException` если не PHARMACY_OWNER.
+- `prisma/schema.prisma` — schema. Product.deletedAt опционал, soft-delete не используется в MVP (deleteProduct делает hide()).
 
 ### Frontend (`apps/web/`)
 
@@ -746,8 +810,8 @@ Session 5 Block 5 (buyer flow) **до сих pending**. Captain не приор�
 **Pharmacy panel (Session 3 redesigned):**
 - `src/features/pharmacy-panel/ui/PharmacyPanelPage.tsx` — Layout с nested Routes.
 - `src/features/pharmacy-panel/ui/PharmacyHomePage.tsx` — 4-card hub с иконками (PR #15).
-- `src/features/pharmacy-panel/ui/products/ProductsListPage.tsx` — chip filters, count badge, sticky search, EmptyState (PR #15).
-- `src/features/pharmacy-panel/ui/products/ProductFormPage.tsx` — Section + Field components, sticky save bar (длинная форма), select для категорий (PR #15, #22).
+- `src/features/pharmacy-panel/ui/products/ProductsListPage.tsx` — chip filters (PR #72 trimmed 6→3: Все/Опубликованные/Скрытые модератором), count badge, sticky search, EmptyState (PR #15).
+- `src/features/pharmacy-panel/ui/products/ProductFormPage.tsx` — Section + Field components, sticky save bar, select для категорий (PR #15, #22). **Image upload через `<ImageUploadField scope="products">` (PR #73)** заменил text URL input. Warning banner со ссылкой на /rules при create (PR #72).
 - `src/features/pharmacy-panel/ui/products/components/{ProductCard,ProductStatusBadge}.tsx` — Pill-based status (PR #15).
 
 **Shared (Session 3 new):**
@@ -756,9 +820,12 @@ Session 5 Block 5 (buyer flow) **до сих pending**. Captain не приор�
 - `src/shared/ui/Pill.tsx` — multi-purpose chip 6 variants × 2 sizes (PR #12).
 - `src/shared/ui/icons.tsx` — кастомные SVG в lucide-стиле (PR #12 — 9 новых).
 - `src/shared/ui/ErrorBoundary.tsx` — **wraps `<AppRouter/>` в Layout** (PR #67). Fallback UI с «Очистить кэш и перезагрузить» button + collapsible детали. `console.error('[DORIFY-CRASH]', ...)` tag. `key={location.pathname}` ремаунтит boundary на route change. **Не удалять — load-bearing для debug в prod.**
+- `src/shared/ui/ImageUploadField.tsx` — **NEW (PR #73)**: generic file picker с size/MIME pre-check, preview, replace, remove. Props `{ scope, value, onChange, label, hint, disabled }`. Используется в Step2Optional (logo во время wizard), ProfilePage (logo edit), ProductFormPage (photo). Заменил старый `LogoUpload`.
+- `src/shared/api/uploads.ts` — **NEW (PR #73)**: `uploadImage(file, scope)` → POST `/uploads/image?scope=...`. `UploadScope = 'logos' | 'products'`.
 - `src/shared/stores/themeStore.ts` — zustand persist для theme override (PR #17).
 - `src/shared/stores/cartStore.ts` — **selectors-only-primitives policy (issue #66):** только `selectTotalItems`/`selectTotalPrice` (return numbers) подписываются через store. Любая collection-building логика — `useMemo` в компоненте на стабильном `items` ref. См. `~/.claude/projects/-Users-avangard-Workspace-projects-dorify-v2/memory/feedback_react19_zustand_selectors.md`.
 - `src/shared/constants/categories.ts` — master 15 категорий (PR #22).
+- `src/features/rules/RulesPage.tsx` — **NEW (PR #72)**: static React page at `/rules` рендерит правила публикации товаров. Mirror of `docs/PRODUCT_RULES.md` (sync manually для MVP). Layout hides Tabbar на этом route.
 
 **Theme / styles:**
 - `src/index.css` — Tailwind + Telegram theme utilities + Tabbar bg override.
