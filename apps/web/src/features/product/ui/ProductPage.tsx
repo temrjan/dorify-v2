@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Text } from '@telegram-apps/telegram-ui';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { productsApi } from '@shared/api/products';
 import { useCartStore } from '@shared/stores/cartStore';
 import { PriceTag } from '@shared/ui/PriceTag';
@@ -10,13 +10,10 @@ import { EmptyState } from '@shared/ui/EmptyState';
 import { Pill } from '@shared/ui/Pill';
 import {
   IconPackage,
-  IconCheck,
   IconAlert,
+  IconCart,
   IconChevronRight,
 } from '@shared/ui/icons';
-
-// Toast visible for 2s — enough to read «Добавлено» + tap «Перейти» if wanted.
-const ADDED_FEEDBACK_MS = 2000;
 
 function ProductSkeleton() {
   return (
@@ -41,17 +38,22 @@ export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const addItem = useCartStore((s) => s.addItem);
-  const [quantity, setQuantity] = useState(1);
-  // `addedAt` doubles as a "show toast" flag and a retrigger key — bumping it
-  // on rapid re-taps re-runs the dismiss effect with a fresh timeout.
-  const [addedAt, setAddedAt] = useState(0);
-  const showAddedToast = addedAt > 0;
+  const updateQuantity = useCartStore((s) => s.updateQuantity);
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', id],
     queryFn: () => productsApi.getById(id!),
     enabled: !!id,
   });
+
+  // Subscribe to this product's cart item only. `find` returns a stable ref
+  // when other items are mutated (cartStore.updateQuantity uses .map with
+  // identity passthrough), so we don't re-render on unrelated cart changes.
+  const cartItem = useCartStore((s) =>
+    s.items.find((i) => i.product.id === product?.id),
+  );
+  const cartQty = cartItem?.quantity ?? 0;
+  const inCart = cartQty > 0;
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -63,12 +65,6 @@ export default function ProductPage() {
       tg?.BackButton.hide();
     };
   }, [navigate]);
-
-  useEffect(() => {
-    if (!showAddedToast) return;
-    const timer = setTimeout(() => setAddedAt(0), ADDED_FEEDBACK_MS);
-    return () => clearTimeout(timer);
-  }, [addedAt, showAddedToast]);
 
   if (isLoading) {
     return <ProductSkeleton />;
@@ -91,20 +87,20 @@ export default function ProductPage() {
   }
 
   const unavailable = !product.isAvailable || product.stock === 0;
-  const totalPrice = product.price * quantity;
+  const stockLimitReached = cartQty >= product.stock;
 
-  const handleAdd = () => {
-    addItem(product, quantity);
-    setAddedAt(Date.now());
-  };
-
-  const handleGoToCart = () => {
-    setAddedAt(0);
-    navigate('/cart');
-  };
+  const handleAddToCart = () => addItem(product, 1);
+  // updateQuantity routes to removeItem when target ≤ 0, so passing
+  // cartQty - 1 at qty=1 naturally reverts the bar to "В корзину" state.
+  const handleDecrement = () => updateQuantity(product.id, cartQty - 1);
+  const handleIncrement = () =>
+    updateQuantity(product.id, Math.min(product.stock, cartQty + 1));
+  const handleGoToCart = () => navigate('/cart');
 
   return (
-    <div className="pb-6">
+    // Bottom padding clears the sticky action bar; mirrors Layout's
+    // tabbar-padding pattern but applied per-page since /product/* hides tabbar.
+    <div className="pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       {/* Image with floating back button — TG BackButton API doesn't
           activate on all clients, so we render our own as belt-and-suspenders.
           Without this, ProductPage has no escape (Tabbar hidden by Layout). */}
@@ -182,80 +178,63 @@ export default function ProductPage() {
             </Text>
           </>
         )}
-
-        {/* Inline CTA — после описания, скроллится с контентом (per Cart lesson PR #20) */}
-        {!unavailable && (
-          <div className="mt-6 bg-tg-section rounded-card shadow-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <Text className="text-tg-hint">Количество</Text>
-              <div className="flex items-center gap-2 bg-tg-secondary rounded-xl px-2 py-1">
-                <button
-                  type="button"
-                  className="w-9 h-9 flex items-center justify-center text-lg font-bold text-tg-hint disabled:opacity-40"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
-                  aria-label="Уменьшить"
-                >
-                  −
-                </button>
-                <span className="w-8 text-center font-medium">{quantity}</span>
-                <button
-                  type="button"
-                  className="w-9 h-9 flex items-center justify-center text-lg font-bold text-dorify-primary disabled:opacity-40"
-                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  disabled={quantity >= product.stock}
-                  aria-label="Увеличить"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between mb-3">
-              <Text className="text-tg-hint">Итого</Text>
-              <PriceTag amount={totalPrice} className="text-lg" />
-            </div>
-
-            <Button
-              mode="filled"
-              size="l"
-              stretched
-              onClick={handleAdd}
-              className="!bg-dorify-primary"
-            >
-              {showAddedToast ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <IconCheck width={18} height={18} />
-                  Добавлено
-                </span>
-              ) : (
-                'В корзину'
-              )}
-            </Button>
-          </div>
-        )}
       </div>
 
-      {/* Added-to-cart toast — Tabbar is hidden on /product/*, so cart badge
-          increment is invisible to the user. This is the primary feedback. */}
-      {showAddedToast && (
+      {/* Sticky action bar — morphs between «В корзину» and stepper+«Перейти»
+          based on whether this product is in cart. Hidden when unavailable. */}
+      {!unavailable && (
         <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-4 inset-x-4 z-50 bg-tg-section shadow-card rounded-card p-3 flex items-center gap-3"
-          style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+          className="fixed bottom-0 inset-x-0 z-40 bg-tg-section border-t border-tg-secondary/50"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          <div className="w-9 h-9 rounded-full bg-dorify-success-light text-dorify-success flex items-center justify-center shrink-0">
-            <IconCheck width={20} height={20} />
+          <div className="p-3">
+            {!inCart ? (
+              <Button
+                mode="filled"
+                size="l"
+                stretched
+                onClick={handleAddToCart}
+                className="!bg-dorify-primary"
+              >
+                В корзину
+              </Button>
+            ) : (
+              <div className="flex gap-3 items-stretch">
+                <div className="flex items-center gap-1 bg-tg-secondary rounded-xl px-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleDecrement}
+                    aria-label="Уменьшить"
+                    className="w-11 h-11 flex items-center justify-center text-2xl text-tg-hint active:opacity-60"
+                  >
+                    −
+                  </button>
+                  <span className="w-7 text-center font-semibold tabular-nums">{cartQty}</span>
+                  <button
+                    type="button"
+                    onClick={handleIncrement}
+                    disabled={stockLimitReached}
+                    aria-label="Увеличить"
+                    className="w-11 h-11 flex items-center justify-center text-2xl text-dorify-primary disabled:opacity-40 active:opacity-60"
+                  >
+                    +
+                  </button>
+                </div>
+                <Button
+                  mode="filled"
+                  size="l"
+                  stretched
+                  onClick={handleGoToCart}
+                  className="!bg-dorify-primary flex-1"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <IconCart width={18} height={18} />
+                    Перейти
+                  </span>
+                </Button>
+              </div>
+            )}
           </div>
-          <Text className="flex-1">Добавлено в корзину</Text>
-          <button
-            type="button"
-            onClick={handleGoToCart}
-            className="text-dorify-primary font-medium px-3 py-1.5 active:opacity-80"
-          >
-            Перейти
-          </button>
         </div>
       )}
     </div>
