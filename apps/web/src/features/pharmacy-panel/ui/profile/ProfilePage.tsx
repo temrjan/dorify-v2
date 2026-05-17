@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Text, Textarea } from '@telegram-apps/telegram-ui';
 import { pharmaciesApi } from '@shared/api/pharmacies';
-import { LogoUpload } from '@features/become-pharmacy/components/LogoUpload';
+import { ImageUploadField } from '@shared/ui/ImageUploadField';
 import { Skeleton } from '@shared/ui/Skeleton';
 import { IconAlert, IconCheck } from '@shared/ui/icons';
 import type { UpdateProfilePayload } from '@shared/api/pharmacies';
@@ -235,10 +235,13 @@ export function ProfilePage() {
           )}
         </div>
 
-        <LogoUpload
+        <ImageUploadField
+          scope="logos"
           value={draft.logo}
           onChange={(url) => updateField('logo', url)}
           disabled={mutation.isPending}
+          label="Логотип аптеки"
+          hint="Покажется покупателям в каталоге · JPEG / PNG / WebP до 5 МБ"
         />
       </section>
 

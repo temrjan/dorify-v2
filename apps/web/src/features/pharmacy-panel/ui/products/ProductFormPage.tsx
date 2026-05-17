@@ -9,6 +9,7 @@ import type {
 } from '@shared/api/pharmacyProducts';
 import type { Product } from '@shared/types';
 import { IconAlert } from '@shared/ui/icons';
+import { ImageUploadField } from '@shared/ui/ImageUploadField';
 import { CATEGORIES } from '@shared/constants/categories';
 import { ProductStatusBadge } from './components/ProductStatusBadge';
 
@@ -97,9 +98,10 @@ function validate(form: FormState): FormErrors {
     errors.price = 'Цена должна быть больше 0';
   }
 
-  if (form.imageUrl && !/^https?:\/\//i.test(form.imageUrl)) {
-    errors.imageUrl = 'URL должен начинаться с http:// или https://';
-  }
+  // imageUrl validation is server-side only — пришедшие из ImageUploadField
+  // URLs всегда наши собственные (api.dorify.uz/uploads/...), а legacy seed
+  // products могут иметь external URLs (читаются read-only). Без regex check
+  // редактирование легаси не блокируется.
 
   if (form.ikpu && !/^\d{17}$/.test(form.ikpu)) {
     errors.ikpu = 'ИКПУ — ровно 17 цифр';
@@ -426,24 +428,14 @@ function ProductForm({ productId, initialProduct }: ProductFormProps) {
 
       {/* Section: Изображение */}
       <Section title="Изображение">
-        <Field label="URL изображения" error={errors.imageUrl}>
-          <Input
-            placeholder="https://..."
-            value={form.imageUrl}
-            onChange={(e) => updateField('imageUrl', e.target.value)}
-            status={errors.imageUrl ? 'error' : undefined}
-          />
-        </Field>
-        {form.imageUrl && !errors.imageUrl && /^https?:\/\//i.test(form.imageUrl) && (
-          <img
-            src={form.imageUrl}
-            alt="превью"
-            className="w-32 h-32 object-cover rounded-lg bg-tg-secondary"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-        )}
+        <ImageUploadField
+          scope="products"
+          value={form.imageUrl}
+          onChange={(url) => updateField('imageUrl', url)}
+          label="Фотография товара"
+          hint="Реальное фото упаковки · JPEG / PNG / WebP до 5 МБ"
+          disabled={isPending}
+        />
       </Section>
 
       {/* Section: OFD (collapsible) */}
