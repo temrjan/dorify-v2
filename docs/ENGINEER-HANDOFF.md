@@ -1,24 +1,32 @@
 # Engineer Handoff — Dorify v2
 
 > Read this **first** in any new Engineer session per `docs/TEAM-CONSTITUTION.md` §0.6.
-> Updated: **2026-05-14** (Session 7 close — Kimi K2.6 audit Tier B closed 5/5; audit critical+high closed 16/16 closable).
+> Updated: **2026-05-17** (Session 9 close — issue #66 closed (Cart React #185 root-caused + fixed); ProductPage UX перепроектирован под Uzum-style sticky bottom action bar).
 
 ---
 
 ## ⚡ TL;DR
 
 **Project:** Multi-tenant аптечный маркетплейс (Telegram Mini App). Миграция Express MVC v1 → NestJS DDD v2.
-**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz` (main=`f84a373`). Health endpoint теперь возвращает `{status:'ok', service:'dorify-api', db:'up', timestamp}` — реальный DB ping (S-HIGH-12). **БД содержит seed data** (1 pharmacy «Аптека Дорифай Демо», 1 PHARMACY_OWNER user `temrjan` Telegram ID 8503214095, 7 products всех статусов) + миграция `add_payment_reconcile_index` применена.
+**State:** `idle`. Production v2 live на `api.dorify.uz` + `app.dorify.uz` (main=`3960b4e`). Buyer flow **разблокирован** — production blocker #66 закрыт; ErrorBoundary + hidden sourcemaps wired-up; ProductPage с sticky bottom action bar.
 **Captain language:** русский, directive-style. Устаёт от ceremony. **Sequential strictly** — не запускать parallel tool calls.
 **Last sessions shipped:**
 - Session 2 (2026-05-08, 6 PR #5–#10): payment frontend flow, pharmacy CRUD, CI/bot/CORS fixes.
 - Session 3 (2026-05-09, 13 PR #12–#25): полный design pass v2.
 - Session 4 (2026-05-09, 6 PR #27–#32): pharmacy onboarding spec + CI hardening + Sprint 0 + audit Phase 1.
 - Session 5 (2026-05-10, 13 PR #34–#46): Sprint 1 e2e + Phase 4 hardening 7/7 + audit deep batch 1.
-- Session 6 (2026-05-11, 11 PR #48–#58): Phase 1 seller-side + Phase 2 customer notifications + Kimi audit Tier A (3 critical IDOR + 1 high + 1 medium).
-- **Session 7 (2026-05-14, 5 PR #59–#63):** **Kimi K2.6 audit Tier B полностью closed** — PublicPharmacyResponse DTO split (S-CRIT-9), createPharmacy `$transaction` + createWithOwnerPromotion repo method (S-CRIT-10 + S-MED-6), stock restore atomic increment (S-HIGH-8), Health DB ping с 2s timeout (S-HIGH-12), Payment reconcile composite index (S-MED-9 + migration applied + EXPLAIN verified). **14 новых unit tests (189 total), все 4 gates green per PR, /typescript-review + /security-review каждому PR.**
-**Production live:** pharmacy full e2e работает (Session 6 features) + audit critical+high закрыты 16/16 closable findings. **Все 5 Kimi critical findings closed.** Tier B PRs ushered through full split-mode pipeline: /codex → intake → plan → /selfcheck (12 findings) → /check (8 findings) → Captain approve → 5 atomic PRs sequential → каждому /typescript-review + /security-review → CI green → merge → post-deploy verify (включая SSH-проверку миграции через `prisma migrate status` + `EXPLAIN ANALYZE`).
-**Next session entry point:** Phase 3 bot UX polish (~30 мин — pendingRejectAt timeout + friendly admin race), либо Phase 7 Search/Avi (~5-7 дней, pgvector + AI search), либо Tier C backlog (S-HIGH-9 outbox pattern, S-HIGH-11 bot persistent session, payment.failed flow, и т.д.), либо buyer-side smoke test (Block 5, ~15 мин — still pending с Session 5). Captain's call.
+- Session 6 (2026-05-11, 11 PR #48–#58): Phase 1 seller-side + Phase 2 customer notifications + Kimi audit Tier A.
+- Session 7 (2026-05-14, 5 PR #59–#63): Kimi K2.6 audit Tier B полностью closed; audit critical+high закрыт 16/16 closable.
+- Session 8 (2026-05-15, 1 PR #65): hotfix-попытка `useShallow(selectItemsByPharmacy)` на /cart white screen — **не помог**. Issue #66 открыт с full diagnosis; Captain: «откроешь issue, в другой сессии пофиксим».
+- **Session 9 (2026-05-17, 4 PR #67–#70):**
+  - **PR #67** — `ErrorBoundary` обёрнут вокруг `<AppRouter/>` в Layout + `vite build.sourcemap: 'hidden'` + `console.error('[DORIFY-CRASH]', ...)` tag. Surfaced real error в production smoke fallback UI: **`Minified React error #185`** (Maximum update depth exceeded).
+  - **PR #68 closes #66.** Root cause: `selectItemsByPharmacy` строил new `Map<string, CartItem[]>` с новыми inner arrays на каждом вызове → `useShallow` shallow-equality на Map entries делает `Object.is` на inner array refs → never stabilizes → React 19 throws #185. PR #65 (useShallow wrap) не помог потому что нестабильность была *внутри* Map. Fix: убрать broken selector, подписываться на стабильный `items` ref + derive view через `useMemo([items])`. CartPage строит Map локально, Checkout/Inquiry collapse к `items.filter(...)`. Drive-by: navigate-during-render в Checkout/Inquiry → `useEffect`.
+  - **PR #69** — ProductPage UX iter 1: visible in-page back button (TG BackButton API не активирует chrome-стрелку на mobile platform Captain'а) + bottom toast с CTA «Перейти» 2s.
+  - **PR #70** — ProductPage UX iter 2 (per Captain Uzum-reference): **sticky bottom action bar** с морфом. Не в корзине → full-width «В корзину». В корзине → `[−] N [+]` stepper + «🛒 Перейти». Quantity sourced from cartStore (single source of truth). Tap «−» при N=1 → cartStore auto-removeItem → bar reverts. Removed: local quantity state, inline «Количество + Итого + Button» блок, toast.
+
+**Production live:** buyer flow прошёл smoke 2026-05-17: HomePage → Catalog → ProductPage (с back-button + sticky bar морф) → Cart (рендерится без white screen, никаких infinite-loop) → Checkout/Inquiry. Profile тоже работает (был collateral broken, починился сам после fresh TWA + новый bundle).
+**Memory saved:** `feedback_react19_zustand_selectors.md` — никогда не строить collections в zustand selector body; использовать `useMemo` в компоненте.
+**Next session entry point:** Phase 3 bot UX polish (~30 мин), либо Phase 7 Search/Avi (~5-7 дней), либо Tier C backlog (S-HIGH-9 outbox, S-HIGH-11 bot persistent session, payment.failed flow), либо migration v1→v2 (~1 неделя). Captain's call.
 
 ---
 
@@ -733,7 +741,7 @@ Session 5 Block 5 (buyer flow) **до сих pending**. Captain не приор�
 - `src/features/payment/ui/PaymentResultPage.tsx` — polling 2s, 60s timeout, UI states (PR #6).
 - `src/features/profile/ui/ProfilePage.tsx` — user card + theme toggle + orders link (PR #17).
 - `src/features/orders/ui/OrdersPage.tsx` — buyer orders (старый стиль, не redesigned).
-- `src/features/product/ui/ProductPage.tsx` — детальная карточка (старый стиль).
+- `src/features/product/ui/ProductPage.tsx` — карточка с floating back-button + **sticky bottom action bar** (Uzum pattern, PR #70): «В корзину» ↔ stepper+«Перейти». Quantity из cartStore (single source). Tap «−» при N=1 → cartStore auto-removes → bar reverts.
 
 **Pharmacy panel (Session 3 redesigned):**
 - `src/features/pharmacy-panel/ui/PharmacyPanelPage.tsx` — Layout с nested Routes.
@@ -747,7 +755,9 @@ Session 5 Block 5 (buyer flow) **до сих pending**. Captain не приор�
 - `src/shared/ui/EmptyState.tsx` — slot icon/title/description/action (PR #12).
 - `src/shared/ui/Pill.tsx` — multi-purpose chip 6 variants × 2 sizes (PR #12).
 - `src/shared/ui/icons.tsx` — кастомные SVG в lucide-стиле (PR #12 — 9 новых).
+- `src/shared/ui/ErrorBoundary.tsx` — **wraps `<AppRouter/>` в Layout** (PR #67). Fallback UI с «Очистить кэш и перезагрузить» button + collapsible детали. `console.error('[DORIFY-CRASH]', ...)` tag. `key={location.pathname}` ремаунтит boundary на route change. **Не удалять — load-bearing для debug в prod.**
 - `src/shared/stores/themeStore.ts` — zustand persist для theme override (PR #17).
+- `src/shared/stores/cartStore.ts` — **selectors-only-primitives policy (issue #66):** только `selectTotalItems`/`selectTotalPrice` (return numbers) подписываются через store. Любая collection-building логика — `useMemo` в компоненте на стабильном `items` ref. См. `~/.claude/projects/-Users-avangard-Workspace-projects-dorify-v2/memory/feedback_react19_zustand_selectors.md`.
 - `src/shared/constants/categories.ts` — master 15 категорий (PR #22).
 
 **Theme / styles:**
