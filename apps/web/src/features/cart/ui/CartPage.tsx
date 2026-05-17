@@ -1,8 +1,13 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
-import { useShallow } from 'zustand/react/shallow';
 import { Button, Spinner, Text } from '@telegram-apps/telegram-ui';
-import { useCartStore, selectTotalItems, selectTotalPrice, selectItemsByPharmacy } from '@shared/stores/cartStore';
+import {
+  useCartStore,
+  selectTotalItems,
+  selectTotalPrice,
+  type CartItem,
+} from '@shared/stores/cartStore';
 import { pharmaciesApi } from '@shared/api/pharmacies';
 import { PriceTag } from '@shared/ui/PriceTag';
 import { IconStore, IconCard, IconAlert } from '@shared/ui/icons';
@@ -12,7 +17,7 @@ interface PharmacyBlockProps {
   pharmacyId: string;
   pharmacy: Pharmacy | undefined;
   pharmacyLoading: boolean;
-  items: ReturnType<typeof selectItemsByPharmacy> extends Map<string, infer V> ? V : never;
+  items: CartItem[];
 }
 
 function formatAmount(amount: number): string {
@@ -169,9 +174,20 @@ export default function CartPage() {
   const clearCart = useCartStore((s) => s.clearCart);
   const totalItems = useCartStore(selectTotalItems);
   const totalPrice = useCartStore(selectTotalPrice);
-  const itemsByPharmacy = useCartStore(useShallow(selectItemsByPharmacy));
+  // Group locally with useMemo: subscribing to a Map-building selector via
+  // `useShallow` infinite-loops because the inner arrays are new every call,
+  // and `Object.is` on Map entries never stabilizes (React #185 / issue #66).
+  const itemsByPharmacy = useMemo(() => {
+    const grouped = new Map<string, CartItem[]>();
+    for (const item of items) {
+      const key = item.product.pharmacyId;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(item);
+    }
+    return grouped;
+  }, [items]);
 
-  const pharmacyIds = Array.from(itemsByPharmacy.keys());
+  const pharmacyIds = useMemo(() => Array.from(itemsByPharmacy.keys()), [itemsByPharmacy]);
   const pharmacyQueries = useQueries({
     queries: pharmacyIds.map((id) => ({
       queryKey: ['pharmacy', id] as const,

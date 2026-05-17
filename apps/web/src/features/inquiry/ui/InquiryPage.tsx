@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useShallow } from 'zustand/react/shallow';
 import { Button, Input, Spinner, Text, Textarea } from '@telegram-apps/telegram-ui';
-import { useCartStore, selectItemsByPharmacy } from '@shared/stores/cartStore';
+import { useCartStore } from '@shared/stores/cartStore';
 import { ordersApi } from '@shared/api/orders';
 import { pharmaciesApi } from '@shared/api/pharmacies';
 import { PriceTag } from '@shared/ui/PriceTag';
@@ -18,9 +17,12 @@ import { IconAlert, IconCheck } from '@shared/ui/icons';
 export default function InquiryPage() {
   const navigate = useNavigate();
   const { pharmacyId = '' } = useParams<{ pharmacyId: string }>();
-  const itemsByPharmacy = useCartStore(useShallow(selectItemsByPharmacy));
+  const cartItems = useCartStore((s) => s.items);
   const clearPharmacy = useCartStore((s) => s.clearPharmacy);
-  const items = itemsByPharmacy.get(pharmacyId) ?? [];
+  const items = useMemo(
+    () => cartItems.filter((i) => i.product.pharmacyId === pharmacyId),
+    [cartItems, pharmacyId],
+  );
 
   const total = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
 
@@ -66,8 +68,15 @@ export default function InquiryPage() {
     },
   });
 
-  if (items.length === 0 && !mutation.isSuccess) {
-    navigate('/cart');
+  // Redirect when cart drains (but keep success screen mounted). Must be in
+  // effect, not during render — react-router's navigate is a setState on the
+  // Router context.
+  const shouldRedirect = items.length === 0 && !mutation.isSuccess;
+  useEffect(() => {
+    if (shouldRedirect) navigate('/cart', { replace: true });
+  }, [shouldRedirect, navigate]);
+
+  if (shouldRedirect) {
     return null;
   }
 
