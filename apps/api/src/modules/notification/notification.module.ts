@@ -3,6 +3,7 @@ import { IamModule } from '../iam/iam.module';
 import { TelegramNotifierService } from './infrastructure/telegram-notifier.service';
 import { OrderNotificationHandler } from './application/event-handlers/on-order-events.handler';
 import { PharmacyNotificationHandler } from './application/event-handlers/on-pharmacy-events.handler';
+import { ProductNotificationHandler } from './application/event-handlers/on-product-events.handler';
 
 @Module({
   imports: [IamModule],
@@ -10,6 +11,7 @@ import { PharmacyNotificationHandler } from './application/event-handlers/on-pha
     TelegramNotifierService,
     OrderNotificationHandler,
     PharmacyNotificationHandler,
+    ProductNotificationHandler,
   ],
 })
 export class NotificationModule {}

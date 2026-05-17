@@ -39,4 +39,22 @@ export const adminApi = {
       throw new Error(`reject failed (${response.status}): ${body}`);
     }
   },
+
+  async hideProduct(productId: string, reason: string): Promise<void> {
+    const response = await fetch(
+      `${config.API_URL.replace(/\/+$/, '')}/admin/products/${productId}/hide`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Service-Token': config.ADMIN_SERVICE_TOKEN,
+        },
+        body: JSON.stringify({ reason }),
+      },
+    );
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`hide product failed (${response.status}): ${body}`);
+    }
+  },
 };

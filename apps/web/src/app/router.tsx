@@ -13,6 +13,7 @@ const ProfilePage = lazy(() => import('@features/profile/ui/ProfilePage'));
 const PharmacyPanelPage = lazy(() => import('@features/pharmacy-panel/ui/PharmacyPanelPage'));
 const BecomePharmacyPage = lazy(() => import('@features/become-pharmacy/BecomePharmacyPage'));
 const InquiryPage = lazy(() => import('@features/inquiry/ui/InquiryPage'));
+const RulesPage = lazy(() => import('@features/rules/RulesPage'));
 
 function Loading() {
   return (
@@ -37,6 +38,7 @@ export function AppRouter() {
         <Route path="/pharmacy/*" element={<PharmacyPanelPage />} />
         <Route path="/become-pharmacy" element={<BecomePharmacyPage />} />
         <Route path="/inquiry/:pharmacyId" element={<InquiryPage />} />
+        <Route path="/rules" element={<RulesPage />} />
       </Routes>
     </Suspense>
   );

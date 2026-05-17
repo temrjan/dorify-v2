@@ -186,6 +186,43 @@ describe('Product', () => {
     expect(product.moderationNote).toBeUndefined();
   });
 
+  // ── Post-moderation MVP (autoPublish + hideByAdmin) ────
+
+  it('autoPublish transitions DRAFT → PUBLISHED without moderator', () => {
+    const product = createProduct();
+    product.autoPublish();
+    expect(product.status).toBe(ProductStatus.PUBLISHED);
+    expect(product.moderatedBy).toBeUndefined();
+    expect(product.moderatedAt).toBeUndefined();
+  });
+
+  it('autoPublish throws if not DRAFT', () => {
+    const product = createProduct();
+    product.autoPublish();
+    expect(() => product.autoPublish()).toThrow('Cannot auto-publish');
+  });
+
+  it('hideByAdmin transitions PUBLISHED → HIDDEN with reason on moderationNote', () => {
+    const product = createProduct();
+    product.autoPublish();
+    product.hideByAdmin('bot-admin', 'Контрафакт');
+    expect(product.status).toBe(ProductStatus.HIDDEN);
+    expect(product.moderatedBy).toBe('bot-admin');
+    expect(product.moderationNote).toBe('Контрафакт');
+    expect(product.moderatedAt).toBeInstanceOf(Date);
+  });
+
+  it('hideByAdmin throws if not PUBLISHED', () => {
+    const product = createProduct();
+    expect(() => product.hideByAdmin('bot-admin', 'reason')).toThrow('Cannot hide');
+  });
+
+  it('hideByAdmin throws on empty reason', () => {
+    const product = createProduct();
+    product.autoPublish();
+    expect(() => product.hideByAdmin('bot-admin', '   ')).toThrow('Hide reason is required');
+  });
+
   // ── Stock management ──────────────────────────────────
 
   it('should decrement stock', () => {

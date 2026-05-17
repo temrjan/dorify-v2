@@ -8,6 +8,23 @@ export class ProductCreatedEvent extends DomainEvent {
       productId: string;
       pharmacyId: string;
       name: string;
+      price: number;
+      category?: string;
+    },
+  ) {
+    super();
+  }
+}
+
+export class ProductHiddenByAdminEvent extends DomainEvent {
+  readonly eventName = 'product.hiddenByAdmin';
+
+  constructor(
+    public readonly payload: {
+      productId: string;
+      pharmacyId: string;
+      name: string;
+      reason: string;
     },
   ) {
     super();

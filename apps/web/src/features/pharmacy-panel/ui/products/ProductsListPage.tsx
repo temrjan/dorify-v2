@@ -17,13 +17,12 @@ interface RouteState {
   toast?: string;
 }
 
+// Post-moderation MVP: new products auto-publish, so PENDING_MODERATION /
+// REJECTED / DRAFT filters are irrelevant — kept в типах для future opt-in.
 const STATUS_FILTERS: Array<{ value: ProductStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'Все' },
   { value: 'PUBLISHED', label: 'Опубликованные' },
-  { value: 'PENDING_MODERATION', label: 'На модерации' },
-  { value: 'REJECTED', label: 'Отклонённые' },
-  { value: 'DRAFT', label: 'Черновики' },
-  { value: 'HIDDEN', label: 'Скрытые' },
+  { value: 'HIDDEN', label: 'Скрытые модератором' },
 ];
 
 export function ProductsListPage() {

@@ -115,6 +115,21 @@ export class Product extends BaseEntity<ProductProps> {
 
   // ── Status transitions ────────────────────────────────────
 
+  /**
+   * Post-moderation model (MVP): trusted pharmacies auto-publish products
+   * after creation. Admin can hide afterwards via {@link hideByAdmin}.
+   * Pre-moderation transitions ({@link submitForModeration}, {@link publish},
+   * {@link reject}) are preserved for future opt-in but not used in the
+   * default flow.
+   */
+  autoPublish(): void {
+    if (this.props.status !== ProductStatus.DRAFT) {
+      throw new DomainError(`Cannot auto-publish from status ${this.props.status}`);
+    }
+    this.props.status = ProductStatus.PUBLISHED;
+    this.touch();
+  }
+
   submitForModeration(): void {
     if (this.props.status !== ProductStatus.DRAFT) {
       throw new DomainError(`Cannot submit for moderation from status ${this.props.status}`);
@@ -149,11 +164,34 @@ export class Product extends BaseEntity<ProductProps> {
     this.touch();
   }
 
+  /**
+   * Owner-initiated hide (delete from catalog flow). No reason needed —
+   * audit trail comes from app logs. Distinct from {@link hideByAdmin}.
+   */
   hide(): void {
     if (this.props.status !== ProductStatus.PUBLISHED) {
       throw new DomainError(`Cannot hide product in status ${this.props.status}`);
     }
     this.props.status = ProductStatus.HIDDEN;
+    this.touch();
+  }
+
+  /**
+   * Admin-initiated post-moderation hide. Reason is required and stored as
+   * moderationNote so the owner can read it in the panel and the bot DM.
+   */
+  hideByAdmin(moderatorId: string, reason: string): void {
+    if (this.props.status !== ProductStatus.PUBLISHED) {
+      throw new DomainError(`Cannot hide product in status ${this.props.status}`);
+    }
+    const trimmed = reason.trim();
+    if (trimmed.length === 0) {
+      throw new DomainError('Hide reason is required');
+    }
+    this.props.status = ProductStatus.HIDDEN;
+    this.props.moderatedBy = moderatorId;
+    this.props.moderatedAt = new Date();
+    this.props.moderationNote = trimmed;
     this.touch();
   }
 
