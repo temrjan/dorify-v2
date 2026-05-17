@@ -66,19 +66,11 @@ export const useCartStore = create<CartState>()(
   ),
 );
 
-// Selectors
+// Primitive selectors — safe to subscribe to directly (return numbers).
 export const selectTotalItems = (state: CartState) =>
   state.items.reduce((sum, i) => sum + i.quantity, 0);
 
 export const selectTotalPrice = (state: CartState) =>
   state.items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
 
-export const selectItemsByPharmacy = (state: CartState) => {
-  const grouped = new Map<string, CartItem[]>();
-  for (const item of state.items) {
-    const key = item.product.pharmacyId;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(item);
-  }
-  return grouped;
-};
+export type { CartItem };

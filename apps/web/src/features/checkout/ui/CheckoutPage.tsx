@@ -1,9 +1,8 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Input, Text, Spinner } from '@telegram-apps/telegram-ui';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useShallow } from 'zustand/react/shallow';
-import { useCartStore, selectItemsByPharmacy } from '@shared/stores/cartStore';
+import { useCartStore } from '@shared/stores/cartStore';
 import { ordersApi } from '@shared/api/orders';
 import { paymentsApi } from '@shared/api/payments';
 import { PriceTag } from '@shared/ui/PriceTag';
@@ -66,13 +65,16 @@ export default function CheckoutPage() {
 
   const items = useCartStore((s) => s.items);
   const clearPharmacy = useCartStore((s) => s.clearPharmacy);
-  const itemsByPharmacy = useCartStore(useShallow(selectItemsByPharmacy));
 
   // Resolve target pharmacy: explicit ?pharmacyId= wins, else first in cart.
-  const targetPharmacyId = pharmacyId ?? Array.from(itemsByPharmacy.keys())[0];
-  const pharmacyItems = targetPharmacyId
-    ? itemsByPharmacy.get(targetPharmacyId) ?? []
-    : [];
+  const targetPharmacyId = pharmacyId ?? items[0]?.product.pharmacyId;
+  const pharmacyItems = useMemo(
+    () =>
+      targetPharmacyId
+        ? items.filter((i) => i.product.pharmacyId === targetPharmacyId)
+        : [],
+    [items, targetPharmacyId],
+  );
   const pharmacyTotal = pharmacyItems.reduce(
     (sum, i) => sum + i.product.price * i.quantity,
     0,
@@ -95,6 +97,14 @@ export default function CheckoutPage() {
       tg?.BackButton.hide();
     };
   }, [navigate]);
+
+  // Redirect when cart drains (post-mutation clearPharmacy or buyer cleared it
+  // from another tab). Must be in effect, not during render — react-router's
+  // navigate is a setState on the Router context.
+  const cartEmpty = items.length === 0 || !targetPharmacyId;
+  useEffect(() => {
+    if (cartEmpty) navigate('/cart', { replace: true });
+  }, [cartEmpty, navigate]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -135,8 +145,8 @@ export default function CheckoutPage() {
     },
   });
 
-  if (items.length === 0 || !targetPharmacyId) {
-    navigate('/cart');
+  if (cartEmpty) {
+    // Effect above will redirect; render nothing until it fires.
     return null;
   }
 
