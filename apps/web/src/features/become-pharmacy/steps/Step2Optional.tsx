@@ -1,6 +1,6 @@
 import { Input, Textarea } from '@telegram-apps/telegram-ui';
 import { Field, Section } from '../components/FormParts';
-import { LogoUpload } from '../components/LogoUpload';
+import { ImageUploadField } from '@shared/ui/ImageUploadField';
 import type { WizardErrors, WizardState } from '../types';
 
 interface Step2Props {
@@ -22,9 +22,12 @@ export function Step2Optional({ state, errors, onChange }: Step2Props) {
           />
         </Field>
 
-        <LogoUpload
+        <ImageUploadField
+          scope="logos"
           value={state.logoUrl}
           onChange={(url) => onChange('logoUrl', url)}
+          label="Логотип аптеки"
+          hint="Покажется покупателям в каталоге · JPEG / PNG / WebP до 5 МБ"
         />
       </Section>
 

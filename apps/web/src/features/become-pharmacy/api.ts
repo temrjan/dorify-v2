@@ -27,12 +27,6 @@ export interface SlugAvailability {
   suggestion?: string;
 }
 
-export interface ImageUploadResponse {
-  url: string;
-  bytes: number;
-  format: string;
-}
-
 export const becomePharmacyApi = {
   checkSlug: (slug: string) =>
     apiClient
@@ -47,15 +41,4 @@ export const becomePharmacyApi = {
 
   updatePaymentSettings: (payload: UpdatePaymentSettingsPayload) =>
     apiClient.put('/pharmacy/payment-settings', payload).then((r) => r.data),
-
-  uploadLogo: async (file: File): Promise<ImageUploadResponse> => {
-    const form = new FormData();
-    form.append('file', file);
-    const response = await apiClient.post<ImageUploadResponse>(
-      '/uploads/image?scope=logos',
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    );
-    return response.data;
-  },
 };

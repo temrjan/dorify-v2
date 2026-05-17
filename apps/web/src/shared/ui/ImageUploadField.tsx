@@ -1,29 +1,51 @@
 import { useRef, useState } from 'react';
 import { Button, Text } from '@telegram-apps/telegram-ui';
-import { becomePharmacyApi } from '../api';
-import { IconAlert, IconImage } from '@shared/ui/icons';
-
-interface LogoUploadProps {
-  value: string;
-  onChange: (url: string) => void;
-  /** External lock — `true` disables picker + replace + remove. Used когда родительский form мутации pending. */
-  disabled?: boolean;
-}
+import { uploadImage, type UploadScope } from '@shared/api/uploads';
+import { IconAlert, IconImage } from './icons';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
-export function LogoUpload({ value, onChange, disabled: externalDisabled = false }: LogoUploadProps) {
+interface ImageUploadFieldProps {
+  scope: UploadScope;
+  value: string;
+  onChange: (url: string) => void;
+  /** Top label rendered above the picker / preview. */
+  label: string;
+  /** Optional hint copy inside the empty-state picker. */
+  hint?: string;
+  /** External lock — `true` disables picker, replace, remove. Used пока parent form мутация pending. */
+  disabled?: boolean;
+}
+
+/**
+ * Single-image upload widget used both by the pharmacy onboarding wizard
+ * (`scope=logos`) and the product editor (`scope=products`). Mirrors
+ * server-side limits client-side для быстрого fail без round-trip:
+ * - 5 MB max
+ * - MIME starts с `image/`
+ *
+ * Server still validates magic bytes and re-rejects anything that lies
+ * about its MIME, so this is purely for UX.
+ */
+export function ImageUploadField({
+  scope,
+  value,
+  onChange,
+  label,
+  hint,
+  disabled: externalDisabled = false,
+}: ImageUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const locked = externalDisabled || uploading;
 
-  const handlePick = () => {
+  const handlePick = (): void => {
     inputRef.current?.click();
   };
 
-  const handleFile = async (file: File) => {
+  const handleFile = async (file: File): Promise<void> => {
     setError(undefined);
 
     if (file.size > MAX_BYTES) {
@@ -37,10 +59,10 @@ export function LogoUpload({ value, onChange, disabled: externalDisabled = false
 
     setUploading(true);
     try {
-      const result = await becomePharmacyApi.uploadLogo(file);
+      const result = await uploadImage(file, scope);
       onChange(result.url);
-    } catch (err) {
-      // Backend rejects non-image via magic bytes (audit P3.1) → 400 BadRequest
+    } catch (err: unknown) {
+      // Backend rejects non-image via magic bytes → 400 BadRequest
       const message = err instanceof Error ? err.message : 'Не удалось загрузить';
       setError(message);
     } finally {
@@ -48,7 +70,7 @@ export function LogoUpload({ value, onChange, disabled: externalDisabled = false
     }
   };
 
-  const handleRemove = () => {
+  const handleRemove = (): void => {
     onChange('');
     setError(undefined);
     if (inputRef.current) inputRef.current.value = '';
@@ -56,7 +78,7 @@ export function LogoUpload({ value, onChange, disabled: externalDisabled = false
 
   return (
     <div>
-      <label className="text-xs text-tg-hint block mb-1">Логотип аптеки</label>
+      <label className="text-xs text-tg-hint block mb-1">{label}</label>
 
       <input
         ref={inputRef}
@@ -65,7 +87,9 @@ export function LogoUpload({ value, onChange, disabled: externalDisabled = false
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) handleFile(file);
+          if (file) {
+            void handleFile(file);
+          }
         }}
       />
 
@@ -73,7 +97,7 @@ export function LogoUpload({ value, onChange, disabled: externalDisabled = false
         <div className="flex items-center gap-3">
           <img
             src={value}
-            alt="Логотип"
+            alt={label}
             className="w-20 h-20 rounded-lg object-cover bg-tg-secondary"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
@@ -93,7 +117,7 @@ export function LogoUpload({ value, onChange, disabled: externalDisabled = false
           type="button"
           onClick={handlePick}
           disabled={locked}
-          aria-label="Загрузить логотип"
+          aria-label={label}
           aria-busy={uploading}
           className="w-full border-2 border-dashed border-tg-hint/30 hover:border-tg-hint/60 rounded-card py-8 px-4 flex flex-col items-center gap-2 transition active:scale-[0.99] disabled:opacity-60"
         >
@@ -101,11 +125,11 @@ export function LogoUpload({ value, onChange, disabled: externalDisabled = false
             <IconImage width={28} height={28} className="text-tg-hint" />
           </span>
           <Text className="text-base font-semibold">
-            {uploading ? 'Загружаем...' : 'Загрузить логотип'}
+            {uploading ? 'Загружаем...' : label}
           </Text>
-          <Text className="text-xs text-tg-hint text-center">
-            Покажется покупателям в каталоге · JPEG / PNG / WebP до 5 МБ
-          </Text>
+          {hint && (
+            <Text className="text-xs text-tg-hint text-center">{hint}</Text>
+          )}
         </button>
       )}
 
