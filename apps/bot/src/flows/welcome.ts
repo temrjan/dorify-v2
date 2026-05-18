@@ -7,8 +7,13 @@ export interface SessionData {
   lang?: Lang;
   /** When admin clicks «Reject» on a pharmacy — pharmacyId awaiting reason text. */
   pendingRejectPharmacyId?: string;
+  /** Wall-clock ms when pendingRejectPharmacyId was set. Used to expire stale
+   * reason prompts (admin tapped Reject, walked away, sent unrelated text). */
+  pendingRejectAt?: number;
   /** When admin clicks «Скрыть» on a product — productId awaiting reason text. */
   pendingHideProductId?: string;
+  /** Wall-clock ms when pendingHideProductId was set. See `pendingRejectAt`. */
+  pendingHideAt?: number;
 }
 
 export type BotContext = Context & SessionFlavor<SessionData>;
